@@ -1,0 +1,22 @@
+{
+  "name": "gitgod",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": { "gitgod": "./dist/cli.js" },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli.ts",
+    "test": "node --test src/**/*.test.ts"
+  },
+  "dependencies": {
+    "commander": "^13.0.0",
+    "remark-parse": "^11.0.0",
+    "unified": "^11.0.0",
+    "unist-util-visit": "^5.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "tsx": "^4.19.0",
+    "@types/node": "^22.0.0"
+  }
+}
