@@ -3,7 +3,73 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import type { Skeleton, Category, Tool, ScrapedData, EnrichProgress } from "../types.js";
 
-async function scrapeSingle(url: string): Promise<ScrapedData | null> {
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || "";
+
+function parseGitHubUrl(url: string): { owner: string; repo: string } | null {
+  const match = url.match(/github\.com\/([^\/\s#?]+)\/([^\/\s#?]+)/);
+  if (!match) return null;
+  const repo = match[2].replace(/\.git$/, "");
+  return { owner: match[1], repo };
+}
+
+async function githubApiFetch(endpoint: string): Promise<any> {
+  const headers: Record<string, string> = {
+    "Accept": "application/vnd.github.v3+json",
+    "User-Agent": "GitGod/0.1",
+  };
+  if (GITHUB_TOKEN) {
+    headers["Authorization"] = `Bearer ${GITHUB_TOKEN}`;
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  const res = await fetch(`https://api.github.com/${endpoint}`, {
+    signal: controller.signal,
+    headers,
+  });
+  clearTimeout(timeout);
+
+  if (!res.ok) return null;
+  return res.json();
+}
+
+async function scrapeGitHub(owner: string, repo: string): Promise<ScrapedData | null> {
+  try {
+    const meta = await githubApiFetch(`repos/${owner}/${repo}`);
+    if (!meta) return null;
+
+    // Fetch README (best-effort)
+    let readme = "";
+    try {
+      const readmeData = await githubApiFetch(`repos/${owner}/${repo}/readme`);
+      if (readmeData?.content) {
+        readme = Buffer.from(readmeData.content, "base64").toString("utf-8");
+      }
+    } catch {
+      // No readme available
+    }
+
+    return {
+      title: meta.full_name || `${owner}/${repo}`,
+      description: meta.description || "",
+      content_preview: readme.slice(0, 2000),
+      github_meta: {
+        stars: meta.stargazers_count || 0,
+        language: meta.language || "unknown",
+        last_commit: meta.pushed_at || "",
+        topics: meta.topics || [],
+      },
+      scraped_at: new Date().toISOString(),
+    };
+  } catch (err: any) {
+    if (err.name === "AbortError") {
+      console.log(`    ⏱ Timeout: github.com/${owner}/${repo}`);
+    }
+    return null;
+  }
+}
+
+async function scrapeWebsite(url: string): Promise<ScrapedData | null> {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
@@ -21,22 +87,6 @@ async function scrapeSingle(url: string): Promise<ScrapedData | null> {
     const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
     const descMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i);
 
-    // For GitHub repos, extract metadata
-    let github_meta: ScrapedData["github_meta"] | undefined;
-    if (url.includes("github.com")) {
-      const starsMatch = html.match(/(\d[\d,]*)\s*stars?/i);
-      const langMatch = html.match(/itemprop="programmingLanguage">([^<]+)/);
-      if (starsMatch || langMatch) {
-        github_meta = {
-          stars: starsMatch ? parseInt(starsMatch[1].replace(/,/g, "")) : 0,
-          language: langMatch ? langMatch[1].trim() : "unknown",
-          last_commit: "",
-          topics: [],
-        };
-      }
-    }
-
-    // Content preview: strip HTML tags, take first 2000 chars
     const textContent = html
       .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
       .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
@@ -49,7 +99,6 @@ async function scrapeSingle(url: string): Promise<ScrapedData | null> {
       title: titleMatch?.[1]?.trim() || "",
       description: descMatch?.[1]?.trim() || "",
       content_preview: textContent,
-      github_meta,
       scraped_at: new Date().toISOString(),
     };
   } catch (err: any) {
@@ -58,6 +107,12 @@ async function scrapeSingle(url: string): Promise<ScrapedData | null> {
     }
     return null;
   }
+}
+
+async function scrapeSingle(url: string): Promise<ScrapedData | null> {
+  const gh = parseGitHubUrl(url);
+  if (gh) return scrapeGitHub(gh.owner, gh.repo);
+  return scrapeWebsite(url);
 }
 
 function flattenTools(categories: Category[]): { tool: Tool; path: string }[] {
@@ -97,6 +152,7 @@ export async function enrich(skeletonPath: string, concurrency: number = 1): Pro
   } else {
     console.log(`[Stage 2] Enriching ${skeleton.stats.links} links (concurrency: ${clampedConcurrency})...`);
   }
+  console.log(`  GitHub API: ${GITHUB_TOKEN ? "authenticated (5k req/hr)" : "unauthenticated (60 req/hr) — set GITHUB_TOKEN for more"}`);
 
   const allTools = flattenTools(skeleton.taxonomy);
   const progress: EnrichProgress = {
@@ -111,7 +167,9 @@ export async function enrich(skeletonPath: string, concurrency: number = 1): Pro
   for (let i = startIndex; i < allTools.length; i++) {
     const { tool, path: catPath } = allTools[i];
     const pct = ((i / allTools.length) * 100).toFixed(1);
-    process.stdout.write(`  [${pct}%] ${i + 1}/${allTools.length} ${tool.name}... `);
+    const isGH = !!parseGitHubUrl(tool.url);
+    const tag = isGH ? "api" : "web";
+    process.stdout.write(`  [${pct}%] ${i + 1}/${allTools.length} [${tag}] ${tool.name}... `);
 
     const scraped = await scrapeSingle(tool.url);
 
@@ -119,7 +177,8 @@ export async function enrich(skeletonPath: string, concurrency: number = 1): Pro
       tool.scraped = scraped;
       tool.status = "alive";
       progress.completed++;
-      console.log("✓");
+      const stars = scraped.github_meta?.stars;
+      console.log(stars ? `✓ ★${stars.toLocaleString()}` : "✓");
     } else {
       tool.status = "dead";
       progress.dead++;
@@ -132,8 +191,8 @@ export async function enrich(skeletonPath: string, concurrency: number = 1): Pro
     writeFileSync(outputPath, JSON.stringify(skeleton, null, 2));
     writeFileSync(progressPath, JSON.stringify(progress, null, 2));
 
-    // Rate limiting: small delay between requests
-    if (i < allTools.length - 1) await sleep(500);
+    // Rate limiting: GitHub API has higher limits (5k/hr with token), websites need more delay
+    if (i < allTools.length - 1) await sleep(isGH ? 100 : 500);
   }
 
   console.log(`\n  ✓ Done: ${progress.completed} alive, ${progress.dead} dead, ${progress.failed} failed`);
