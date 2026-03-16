@@ -5,6 +5,10 @@ import path from "node:path";
 import { loadGraphs } from "../loader.js";
 import { listGraphs } from "./list-graphs.js";
 import { getStats } from "./stats.js";
+import { ask } from "./ask.js";
+import { find } from "./find.js";
+import { compare } from "./compare.js";
+import { recommend } from "./recommend.js";
 
 const TEST_DATA_DIR = path.join(import.meta.dirname, "../../../.test-data-tools");
 
@@ -84,6 +88,101 @@ describe("getStats", () => {
       const index = loadGraphs(TEST_DATA_DIR);
       const result = getStats(index, { graph: "repo-a" });
       assert.equal(result.total_graphs, 1);
+    } finally {
+      cleanup();
+    }
+  });
+});
+
+describe("ask", () => {
+  it("returns tools matching a natural language question", () => {
+    setup();
+    try {
+      const index = loadGraphs(TEST_DATA_DIR);
+      const result = ask(index, { question: "tools with tag-a" });
+      assert.ok(result.results.length > 0);
+      assert.ok(result.question);
+      assert.ok(result.total_searched > 0);
+    } finally {
+      cleanup();
+    }
+  });
+});
+
+describe("find", () => {
+  it("filters tools by tags", () => {
+    setup();
+    try {
+      const index = loadGraphs(TEST_DATA_DIR);
+      const result = find(index, { tags: ["tag-b"] });
+      assert.ok(result.results.length > 0);
+      assert.ok(result.results.every((r) => r.tags.includes("tag-b")));
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("supports pagination", () => {
+    setup();
+    try {
+      const index = loadGraphs(TEST_DATA_DIR);
+      const page1 = find(index, { limit: 2, offset: 0 });
+      const page2 = find(index, { limit: 2, offset: 2 });
+      assert.equal(page1.results.length, 2);
+      assert.ok(page1.total > 2);
+    } finally {
+      cleanup();
+    }
+  });
+});
+
+describe("compare", () => {
+  it("compares two tools side by side", () => {
+    setup();
+    try {
+      const index = loadGraphs(TEST_DATA_DIR);
+      const result = compare(index, { tools: ["Tool0", "Tool1"] });
+      assert.equal(result.comparison.length, 2);
+      assert.ok(Array.isArray(result.shared_tags));
+      assert.ok(result.unique_tags);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("reports not_found for unknown tools", () => {
+    setup();
+    try {
+      const index = loadGraphs(TEST_DATA_DIR);
+      const result = compare(index, { tools: ["Tool0", "NonExistent"] });
+      assert.equal(result.comparison.length, 1);
+      assert.deepStrictEqual(result.not_found, ["NonExistent"]);
+    } finally {
+      cleanup();
+    }
+  });
+});
+
+describe("recommend", () => {
+  it("recommends tools for a use case", () => {
+    setup();
+    try {
+      const index = loadGraphs(TEST_DATA_DIR);
+      const result = recommend(index, { use_case: "things with tag-a" });
+      assert.ok(result.recommendations.length > 0);
+      assert.ok(result.recommendations[0].match_score >= 0);
+      assert.ok(result.recommendations[0].match_score <= 1);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("excludes specified tools", () => {
+    setup();
+    try {
+      const index = loadGraphs(TEST_DATA_DIR);
+      const result = recommend(index, { use_case: "things", exclude: ["Tool0"] });
+      assert.ok(result.recommendations.every((r) => r.name !== "Tool0"));
     } finally {
       cleanup();
     }
