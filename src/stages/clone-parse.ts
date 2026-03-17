@@ -1,5 +1,5 @@
 // src/stages/clone-parse.ts
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from "node:fs";
 import path from "node:path";
 import { parseReadme } from "../parsers/markdown-ast.js";
@@ -23,7 +23,7 @@ export async function cloneAndParse(url: string): Promise<string> {
   mkdirSync(path.dirname(tmpDir), { recursive: true });
 
   console.log(`  Cloning ${url}...`);
-  execSync(`git clone --depth 1 ${url} ${tmpDir}`, { stdio: "pipe" });
+  execFileSync("git", ["clone", "--depth", "1", url, tmpDir], { stdio: "pipe" });
 
   // Find README
   const readmePath = path.join(tmpDir, "README.md");

@@ -1,6 +1,5 @@
-import { describe, it } from "node:test";
-import assert from "node:assert";
-import { handleRequest, type JsonRpcRequest, type JsonRpcResponse } from "./server.js";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { handleRequest, type JsonRpcRequest } from "./server.js";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import path from "node:path";
 import { loadGraphs } from "./loader.js";
@@ -43,90 +42,71 @@ function cleanup() {
 }
 
 describe("handleRequest", () => {
-  it("responds to tools/list with all tool definitions", () => {
-    setup();
-    try {
-      const index = loadGraphs(TEST_DATA_DIR);
-      const req: JsonRpcRequest = { jsonrpc: "2.0", id: 1, method: "tools/list", params: {} };
-      const res = handleRequest(req, index);
-      assert.equal(res.jsonrpc, "2.0");
-      assert.equal(res.id, 1);
-      assert.ok(Array.isArray(res.result.tools));
-      assert.equal(res.result.tools.length, 6); // ask, find, compare, recommend, list_graphs, stats
-    } finally {
-      cleanup();
-    }
+  beforeEach(() => setup());
+  afterEach(() => cleanup());
+
+  it("responds to tools/list with all tool definitions", async () => {
+    const index = loadGraphs(TEST_DATA_DIR);
+    const req: JsonRpcRequest = { jsonrpc: "2.0", id: 1, method: "tools/list", params: {} };
+    const res = await handleRequest(req, index, TEST_DATA_DIR);
+    expect(res.jsonrpc).toBe("2.0");
+    expect(res.id).toBe(1);
+    const listResult = res.result as { tools: unknown[] };
+    expect(Array.isArray(listResult.tools)).toBe(true);
+    expect(listResult.tools.length).toBe(7);
   });
 
-  it("dispatches tools/call for list_graphs", () => {
-    setup();
-    try {
-      const index = loadGraphs(TEST_DATA_DIR);
-      const req: JsonRpcRequest = {
-        jsonrpc: "2.0",
-        id: 2,
-        method: "tools/call",
-        params: { name: "list_graphs", arguments: {} },
-      };
-      const res = handleRequest(req, index);
-      assert.equal(res.id, 2);
-      const content = JSON.parse(res.result.content[0].text);
-      assert.equal(content.total_graphs, 1);
-    } finally {
-      cleanup();
-    }
+  it("dispatches tools/call for list_graphs", async () => {
+    const index = loadGraphs(TEST_DATA_DIR);
+    const req: JsonRpcRequest = {
+      jsonrpc: "2.0",
+      id: 2,
+      method: "tools/call",
+      params: { name: "list_graphs", arguments: {} },
+    };
+    const res = await handleRequest(req, index, TEST_DATA_DIR);
+    expect(res.id).toBe(2);
+    const callResult = res.result as { content: Array<{ text: string }> };
+    const content = JSON.parse(callResult.content[0].text);
+    expect(content.total_graphs).toBe(1);
   });
 
-  it("dispatches tools/call for ask", () => {
-    setup();
-    try {
-      const index = loadGraphs(TEST_DATA_DIR);
-      const req: JsonRpcRequest = {
-        jsonrpc: "2.0",
-        id: 3,
-        method: "tools/call",
-        params: { name: "ask", arguments: { question: "testing tools" } },
-      };
-      const res = handleRequest(req, index);
-      const content = JSON.parse(res.result.content[0].text);
-      assert.ok(content.results.length > 0);
-    } finally {
-      cleanup();
-    }
+  it("dispatches tools/call for ask", async () => {
+    const index = loadGraphs(TEST_DATA_DIR);
+    const req: JsonRpcRequest = {
+      jsonrpc: "2.0",
+      id: 3,
+      method: "tools/call",
+      params: { name: "ask", arguments: { question: "testing tools" } },
+    };
+    const res = await handleRequest(req, index, TEST_DATA_DIR);
+    const callResult = res.result as { content: Array<{ text: string }> };
+    const content = JSON.parse(callResult.content[0].text);
+    expect(content.results.length).toBeGreaterThan(0);
   });
 
-  it("returns error for unknown tool", () => {
-    setup();
-    try {
-      const index = loadGraphs(TEST_DATA_DIR);
-      const req: JsonRpcRequest = {
-        jsonrpc: "2.0",
-        id: 4,
-        method: "tools/call",
-        params: { name: "nonexistent", arguments: {} },
-      };
-      const res = handleRequest(req, index);
-      assert.ok(res.error);
-      assert.equal(res.error.code, -32601);
-    } finally {
-      cleanup();
-    }
+  it("returns error for unknown tool", async () => {
+    const index = loadGraphs(TEST_DATA_DIR);
+    const req: JsonRpcRequest = {
+      jsonrpc: "2.0",
+      id: 4,
+      method: "tools/call",
+      params: { name: "nonexistent", arguments: {} },
+    };
+    const res = await handleRequest(req, index, TEST_DATA_DIR);
+    expect(res.error).toBeDefined();
+    expect(res.error!.code).toBe(-32601);
   });
 
-  it("returns error for unknown method", () => {
-    setup();
-    try {
-      const index = loadGraphs(TEST_DATA_DIR);
-      const req: JsonRpcRequest = {
-        jsonrpc: "2.0",
-        id: 5,
-        method: "unknown/method",
-        params: {},
-      };
-      const res = handleRequest(req, index);
-      assert.ok(res.error);
-    } finally {
-      cleanup();
-    }
+  it("returns error for unknown method", async () => {
+    const index = loadGraphs(TEST_DATA_DIR);
+    const req: JsonRpcRequest = {
+      jsonrpc: "2.0",
+      id: 5,
+      method: "unknown/method",
+      params: {},
+    };
+    const res = await handleRequest(req, index, TEST_DATA_DIR);
+    expect(res.error).toBeDefined();
   });
 });

@@ -1,5 +1,4 @@
-import { describe, it } from "node:test";
-import assert from "node:assert";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import path from "node:path";
 import { loadGraphs } from "../loader.js";
@@ -50,141 +49,108 @@ function cleanup() {
 }
 
 describe("listGraphs", () => {
+  beforeEach(() => setup());
+  afterEach(() => cleanup());
+
   it("returns all graphs with stats", () => {
-    setup();
-    try {
-      const index = loadGraphs(TEST_DATA_DIR);
-      const result = listGraphs(index);
-      assert.equal(result.total_graphs, 2);
-      assert.equal(result.graphs.length, 2);
-      assert.ok(result.graphs[0].slug);
-      assert.ok(result.graphs[0].stats.total_tools > 0);
-    } finally {
-      cleanup();
-    }
+    const index = loadGraphs(TEST_DATA_DIR);
+    const result = listGraphs(index);
+    expect(result.total_graphs).toBe(2);
+    expect(result.graphs.length).toBe(2);
+    expect(result.graphs[0].slug).toBeDefined();
+    expect(result.graphs[0].stats.total_tools).toBeGreaterThan(0);
   });
 });
 
 describe("getStats", () => {
+  beforeEach(() => setup());
+  afterEach(() => cleanup());
+
   it("returns aggregate stats across all graphs", () => {
-    setup();
-    try {
-      const index = loadGraphs(TEST_DATA_DIR);
-      const result = getStats(index, {});
-      assert.equal(result.total_graphs, 2);
-      assert.ok(result.total_tools > 0);
-      assert.ok(result.total_alive > 0);
-      assert.ok(result.tag_distribution["tag-a"] > 0);
-      assert.ok(result.score_distribution);
-      assert.ok(result.top_tools.length > 0);
-    } finally {
-      cleanup();
-    }
+    const index = loadGraphs(TEST_DATA_DIR);
+    const result = getStats(index, {});
+    expect(result.total_graphs).toBe(2);
+    expect(result.total_tools).toBeGreaterThan(0);
+    expect(result.total_alive).toBeGreaterThan(0);
+    expect(result.tag_distribution["tag-a"]).toBeGreaterThan(0);
+    expect(result.score_distribution).toBeDefined();
+    expect(result.top_tools.length).toBeGreaterThan(0);
   });
 
   it("returns stats for a single graph when filtered", () => {
-    setup();
-    try {
-      const index = loadGraphs(TEST_DATA_DIR);
-      const result = getStats(index, { graph: "repo-a" });
-      assert.equal(result.total_graphs, 1);
-    } finally {
-      cleanup();
-    }
+    const index = loadGraphs(TEST_DATA_DIR);
+    const result = getStats(index, { graph: "repo-a" });
+    expect(result.total_graphs).toBe(1);
   });
 });
 
 describe("ask", () => {
+  beforeEach(() => setup());
+  afterEach(() => cleanup());
+
   it("returns tools matching a natural language question", () => {
-    setup();
-    try {
-      const index = loadGraphs(TEST_DATA_DIR);
-      const result = ask(index, { question: "tools with tag-a" });
-      assert.ok(result.results.length > 0);
-      assert.ok(result.question);
-      assert.ok(result.total_searched > 0);
-    } finally {
-      cleanup();
-    }
+    const index = loadGraphs(TEST_DATA_DIR);
+    const result = ask(index, { question: "tools with tag-a" });
+    expect(result.results.length).toBeGreaterThan(0);
+    expect(result.question).toBeDefined();
+    expect(result.total_searched).toBeGreaterThan(0);
   });
 });
 
 describe("find", () => {
+  beforeEach(() => setup());
+  afterEach(() => cleanup());
+
   it("filters tools by tags", () => {
-    setup();
-    try {
-      const index = loadGraphs(TEST_DATA_DIR);
-      const result = find(index, { tags: ["tag-b"] });
-      assert.ok(result.results.length > 0);
-      assert.ok(result.results.every((r) => r.tags.includes("tag-b")));
-    } finally {
-      cleanup();
-    }
+    const index = loadGraphs(TEST_DATA_DIR);
+    const result = find(index, { tags: ["tag-b"] });
+    expect(result.results.length).toBeGreaterThan(0);
+    expect(result.results.every((r) => r.tags.includes("tag-b"))).toBe(true);
   });
 
   it("supports pagination", () => {
-    setup();
-    try {
-      const index = loadGraphs(TEST_DATA_DIR);
-      const page1 = find(index, { limit: 2, offset: 0 });
-      const page2 = find(index, { limit: 2, offset: 2 });
-      assert.equal(page1.results.length, 2);
-      assert.ok(page1.total > 2);
-    } finally {
-      cleanup();
-    }
+    const index = loadGraphs(TEST_DATA_DIR);
+    const page1 = find(index, { limit: 2, offset: 0 });
+    expect(page1.results.length).toBe(2);
+    expect(page1.total).toBeGreaterThan(2);
   });
 });
 
 describe("compare", () => {
+  beforeEach(() => setup());
+  afterEach(() => cleanup());
+
   it("compares two tools side by side", () => {
-    setup();
-    try {
-      const index = loadGraphs(TEST_DATA_DIR);
-      const result = compare(index, { tools: ["Tool0", "Tool1"] });
-      assert.equal(result.comparison.length, 2);
-      assert.ok(Array.isArray(result.shared_tags));
-      assert.ok(result.unique_tags);
-    } finally {
-      cleanup();
-    }
+    const index = loadGraphs(TEST_DATA_DIR);
+    const result = compare(index, { tools: ["Tool0", "Tool1"] });
+    expect(result.comparison.length).toBe(2);
+    expect(Array.isArray(result.shared_tags)).toBe(true);
+    expect(result.unique_tags).toBeDefined();
   });
 
   it("reports not_found for unknown tools", () => {
-    setup();
-    try {
-      const index = loadGraphs(TEST_DATA_DIR);
-      const result = compare(index, { tools: ["Tool0", "NonExistent"] });
-      assert.equal(result.comparison.length, 1);
-      assert.deepStrictEqual(result.not_found, ["NonExistent"]);
-    } finally {
-      cleanup();
-    }
+    const index = loadGraphs(TEST_DATA_DIR);
+    const result = compare(index, { tools: ["Tool0", "NonExistent"] });
+    expect(result.comparison.length).toBe(1);
+    expect(result.not_found).toEqual(["NonExistent"]);
   });
 });
 
 describe("recommend", () => {
+  beforeEach(() => setup());
+  afterEach(() => cleanup());
+
   it("recommends tools for a use case", () => {
-    setup();
-    try {
-      const index = loadGraphs(TEST_DATA_DIR);
-      const result = recommend(index, { use_case: "things with tag-a" });
-      assert.ok(result.recommendations.length > 0);
-      assert.ok(result.recommendations[0].match_score >= 0);
-      assert.ok(result.recommendations[0].match_score <= 1);
-    } finally {
-      cleanup();
-    }
+    const index = loadGraphs(TEST_DATA_DIR);
+    const result = recommend(index, { use_case: "things with tag-a" });
+    expect(result.recommendations.length).toBeGreaterThan(0);
+    expect(result.recommendations[0].match_score).toBeGreaterThanOrEqual(0);
+    expect(result.recommendations[0].match_score).toBeLessThanOrEqual(1);
   });
 
   it("excludes specified tools", () => {
-    setup();
-    try {
-      const index = loadGraphs(TEST_DATA_DIR);
-      const result = recommend(index, { use_case: "things", exclude: ["Tool0"] });
-      assert.ok(result.recommendations.every((r) => r.name !== "Tool0"));
-    } finally {
-      cleanup();
-    }
+    const index = loadGraphs(TEST_DATA_DIR);
+    const result = recommend(index, { use_case: "things", exclude: ["Tool0"] });
+    expect(result.recommendations.every((r) => r.name !== "Tool0")).toBe(true);
   });
 });

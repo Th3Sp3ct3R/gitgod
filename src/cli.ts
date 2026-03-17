@@ -1,5 +1,7 @@
 // src/cli.ts
 import { Command } from "commander";
+import path from "node:path";
+import { startServer } from "./acp/server.js";
 
 const program = new Command();
 
@@ -22,7 +24,9 @@ program
   .option("-c, --concurrency <n>", "concurrent scrapes (1-5)", "1")
   .action(async (skeleton: string, opts: { concurrency: string }) => {
     const { enrich } = await import("./stages/enrich.js");
-    await enrich(skeleton, parseInt(opts.concurrency));
+    const concurrency = parseInt(opts.concurrency, 10);
+    if (isNaN(concurrency)) throw new Error(`Invalid concurrency value: ${opts.concurrency}`);
+    await enrich(skeleton, concurrency);
   });
 
 program
@@ -42,6 +46,16 @@ program
   });
 
 program
+  .command("ingest <url>")
+  .description("Ingest a single repo (not an awesome-list) into the knowledge graph")
+  .option("-d, --data-dir <path>", "Data directory (default: ./data)", "./data")
+  .action(async (url: string, opts: { dataDir: string }) => {
+    const { ingestSingleRepo } = await import("./stages/ingest-single.js");
+    const dataDir = path.resolve(process.cwd(), opts.dataDir);
+    await ingestSingleRepo(url, dataDir);
+  });
+
+program
   .command("scrape <url>")
   .description("Full pipeline: parse → enrich → synthesize")
   .option("-c, --concurrency <n>", "concurrent scrapes (1-5)", "1")
@@ -51,8 +65,19 @@ program
     const { synthesize } = await import("./stages/synthesize.js");
 
     const skeletonPath = await cloneAndParse(url);
-    const enrichedPath = await enrich(skeletonPath, parseInt(opts.concurrency));
+    const c = parseInt(opts.concurrency, 10);
+    if (isNaN(c)) throw new Error(`Invalid concurrency value: ${opts.concurrency}`);
+    const enrichedPath = await enrich(skeletonPath, c);
     await synthesize(enrichedPath);
+  });
+
+program
+  .command("serve")
+  .description("Start MCP server (stdio). Used by Cursor/Claude Code to expose ask, find, compare, recommend tools.")
+  .option("-d, --data-dir <path>", "Directory containing knowledge graphs (default: ./data)", "./data")
+  .action((opts: { dataDir: string }) => {
+    const dataDir = path.resolve(process.cwd(), process.env.GITGOD_DATA_DIR ?? opts.dataDir);
+    startServer(dataDir);
   });
 
 program.parse();

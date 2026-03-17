@@ -1,5 +1,4 @@
-import { describe, it } from "node:test";
-import assert from "node:assert";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import path from "node:path";
 import { loadGraphs, type LoadedGraph, type GraphIndex } from "./loader.js";
@@ -87,55 +86,43 @@ function cleanupTestData() {
 }
 
 describe("loadGraphs", () => {
+  beforeEach(() => setupTestData());
+  afterEach(() => cleanupTestData());
+
   it("loads all knowledge graph files from data directory", () => {
-    setupTestData();
-    try {
-      const index = loadGraphs(TEST_DATA_DIR);
-      assert.equal(index.graphs.length, 1);
-      assert.equal(index.graphs[0].slug, "test-repo");
-      assert.equal(index.graphs[0].repo, "test/repo");
-      assert.equal(index.allTools.length, 2); // only alive tools
-      assert.equal(index.allTools[0].name, "ToolA");
-      assert.equal(index.allTools[1].name, "ToolB");
-    } finally {
-      cleanupTestData();
-    }
+    const index = loadGraphs(TEST_DATA_DIR);
+    expect(index.graphs.length).toBe(1);
+    expect(index.graphs[0].slug).toBe("test-repo");
+    expect(index.graphs[0].repo).toBe("test/repo");
+    expect(index.allTools.length).toBe(2);
+    expect(index.allTools[0].name).toBe("ToolA");
+    expect(index.allTools[1].name).toBe("ToolB");
   });
 
   it("flattens tools with graph slug and category path", () => {
-    setupTestData();
-    try {
-      const index = loadGraphs(TEST_DATA_DIR);
-      const toolA = index.allTools.find((t) => t.name === "ToolA");
-      assert.ok(toolA);
-      assert.equal(toolA.graphSlug, "test-repo");
-      assert.equal(toolA.categoryPath, "Search");
+    const index = loadGraphs(TEST_DATA_DIR);
+    const toolA = index.allTools.find((t) => t.name === "ToolA");
+    expect(toolA).toBeDefined();
+    expect(toolA!.graphSlug).toBe("test-repo");
+    expect(toolA!.categoryPath).toBe("Search");
 
-      const toolB = index.allTools.find((t) => t.name === "ToolB");
-      assert.ok(toolB);
-      assert.equal(toolB.categoryPath, "Search > People");
-    } finally {
-      cleanupTestData();
-    }
+    const toolB = index.allTools.find((t) => t.name === "ToolB");
+    expect(toolB).toBeDefined();
+    expect(toolB!.categoryPath).toBe("Search > People");
   });
 
   it("computes per-graph stats", () => {
-    setupTestData();
-    try {
-      const index = loadGraphs(TEST_DATA_DIR);
-      const graph = index.graphs[0];
-      assert.equal(graph.stats.total_tools, 3); // alive + dead
-      assert.equal(graph.stats.alive, 2);
-      assert.equal(graph.stats.dead, 1);
-      assert.equal(graph.stats.synthesized, 2);
-    } finally {
-      cleanupTestData();
-    }
+    const index = loadGraphs(TEST_DATA_DIR);
+    const graph = index.graphs[0];
+    expect(graph.stats.total_tools).toBe(3);
+    expect(graph.stats.alive).toBe(2);
+    expect(graph.stats.dead).toBe(1);
+    expect(graph.stats.synthesized).toBe(2);
   });
 
   it("returns empty index when no data directory exists", () => {
     const index = loadGraphs("/nonexistent/path");
-    assert.equal(index.graphs.length, 0);
-    assert.equal(index.allTools.length, 0);
+    expect(index.graphs.length).toBe(0);
+    expect(index.allTools.length).toBe(0);
   });
 });
