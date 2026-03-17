@@ -1,0 +1,46 @@
+{
+  "name": "workflow-agent",
+  "version": "1.0.0",
+  "description": "Portable workflow orchestrator for CEO Review → Eng Review → Implement → Review → Ship → QA → Retro",
+  "main": "dist/index.js",
+  "bin": {
+    "workflow": "dist/cli.js",
+    "wf": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/cli.ts",
+    "test": "jest",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "workflow",
+    "agent",
+    "orchestrator",
+    "claude",
+    "review",
+    "ship"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "commander": "^11.1.0",
+    "inquirer": "^8.2.6",
+    "ora": "^5.4.1",
+    "simple-git": "^3.20.0",
+    "yaml": "^2.3.4"
+  },
+  "devDependencies": {
+    "@types/glob": "^8.1.0",
+    "@types/inquirer": "^8.2.10",
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.10.0",
+    "jest": "^29.7.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
