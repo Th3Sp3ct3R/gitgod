@@ -1,0 +1,3 @@
+[submodule "agent-frameworks/CLI-Anything"]
+	path = agent-frameworks/CLI-Anything
+	url = https://github.com/HKUDS/CLI-Anything.git
