@@ -5,6 +5,8 @@ import { ask } from "./tools/ask.js";
 import { find } from "./tools/find.js";
 import { compare } from "./tools/compare.js";
 import { recommend } from "./tools/recommend.js";
+import { ingestHarness } from "./tools/ingest.js";
+import { invokeHarnessCommand } from "./tools/invoke.js";
 
 export interface JsonRpcRequest {
   jsonrpc: "2.0";
@@ -97,9 +99,40 @@ const TOOL_DEFINITIONS = [
       },
     },
   },
+  {
+    name: "ingest",
+    description: "Ingest a generated harness JSON/SKILL.md payload into the knowledge graph.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        slug: { type: "string", description: "Repository slug for the graph entry" },
+        harness_json_path: {
+          type: "string",
+          description: "Optional path to a harness cache json file. Defaults to data/harnesses/<slug>.json",
+        },
+      },
+      required: ["slug"],
+    },
+  },
+  {
+    name: "invoke",
+    description: "Invoke an allowlisted command from a generated harness cache.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        tool: { type: "string", description: "Harness slug, e.g. instagrowth-saas" },
+        command: { type: "string", description: "CLI command id or name to execute" },
+        args: {
+          type: "object",
+          description: "CLI arg object, e.g. { \"--env\": \"staging\" }",
+        },
+      },
+      required: ["tool", "command"],
+    },
+  },
 ];
 
-export function handleRequest(req: JsonRpcRequest, index: GraphIndex): JsonRpcResponse {
+export function handleRequest(req: JsonRpcRequest, index: GraphIndex, dataDir: string): JsonRpcResponse {
   const { id, method, params } = req;
 
   if (method === "initialize") {
@@ -126,22 +159,31 @@ export function handleRequest(req: JsonRpcRequest, index: GraphIndex): JsonRpcRe
       let result: unknown;
       switch (toolName) {
         case "ask":
-          result = ask(index, args as Parameters<typeof ask>[1]);
+          result = ask(index, args as unknown as Parameters<typeof ask>[1]);
           break;
         case "find":
-          result = find(index, args as Parameters<typeof find>[1]);
+          result = find(index, args as unknown as Parameters<typeof find>[1]);
           break;
         case "compare":
-          result = compare(index, args as Parameters<typeof compare>[1]);
+          result = compare(index, args as unknown as Parameters<typeof compare>[1]);
           break;
         case "recommend":
-          result = recommend(index, args as Parameters<typeof recommend>[1]);
+          result = recommend(index, args as unknown as Parameters<typeof recommend>[1]);
           break;
         case "list_graphs":
           result = listGraphs(index);
           break;
         case "stats":
-          result = getStats(index, args as Parameters<typeof getStats>[1]);
+          result = getStats(index, args as unknown as Parameters<typeof getStats>[1]);
+          break;
+        case "ingest":
+          result = ingestHarness(dataDir, args as unknown as Parameters<typeof ingestHarness>[1]);
+          break;
+        case "invoke":
+          result = invokeHarnessCommand(
+            dataDir,
+            args as unknown as Parameters<typeof invokeHarnessCommand>[1]
+          );
           break;
         default:
           return {
@@ -237,7 +279,7 @@ export function startServer(dataDir: string): void {
     // Hot-reload: re-scan data directory
     index = loadGraphs(dataDir);
 
-    const response = handleRequest(req, index);
+    const response = handleRequest(req, index, dataDir);
 
     if (req.id !== undefined) {
       sendResponse(response);

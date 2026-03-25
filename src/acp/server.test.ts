@@ -53,7 +53,7 @@ describe("handleRequest", () => {
     expect(res.id).toBe(1);
     const listResult = res.result as { tools: unknown[] };
     expect(Array.isArray(listResult.tools)).toBe(true);
-    expect(listResult.tools.length).toBe(7);
+    expect(listResult.tools.length).toBe(8);
   });
 
   it("dispatches tools/call for list_graphs", async () => {

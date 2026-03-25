@@ -13,6 +13,11 @@ export class ClaudeAdapter extends BaseAdapter implements EnvironmentAdapter {
     if (process.env.CLAUDE_CODE === '1' || process.env.CLAUDE_CODE === 'true') {
       return true;
     }
+    
+    // Check for experimental Claude Code flag
+    if (process.env.CLAUDE_CODE_EXPERIMENTAL) {
+      return true;
+    }
 
     // Check if claude CLI is available
     const hasClaudeCLI = await this.checkCommandExists('claude');

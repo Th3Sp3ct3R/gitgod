@@ -1,66 +1,14 @@
 // src/stages/synthesize.ts
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import Anthropic from "@anthropic-ai/sdk";
 import type { Skeleton, Category, Tool, SynthesisData } from "../types.js";
+import { detectProvider, callLLM } from "../lib/llm.js";
 
 const BATCH_SIZE = 20;
 const MAX_RETRIES = 3;
 const RETRY_BASE_DELAY_MS = 2000;
 const MAX_CONSECUTIVE_FAILURES = 5;
 const BATCH_DELAY_MS = 500;
-
-type LLMProvider = "anthropic" | "openrouter";
-
-function detectProvider(): { provider: LLMProvider; model: string } {
-  if (process.env.OPENROUTER_API_KEY) {
-    return {
-      provider: "openrouter",
-      model: process.env.OPENROUTER_MODEL || "arcee-ai/trinity-large-preview:free",
-    };
-  }
-  return {
-    provider: "anthropic",
-    model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514",
-  };
-}
-
-async function callLLM(prompt: string): Promise<string> {
-  const { provider, model } = detectProvider();
-
-  if (provider === "openrouter") {
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://github.com/gitgod",
-        "X-Title": "GitGod",
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: 4096,
-      }),
-    });
-    if (!res.ok) throw new Error(`OpenRouter error: ${res.status} ${await res.text()}`);
-    const data = await res.json() as { choices?: { message?: { content?: string } }[] };
-    const content = data.choices?.[0]?.message?.content;
-    if (!content) throw new Error(`OpenRouter returned empty response: ${JSON.stringify(data).slice(0, 200)}`);
-    return content;
-  }
-
-  // Anthropic (default) — supports custom base URL via ANTHROPIC_BASE_URL
-  const client = new Anthropic({
-    baseURL: process.env.ANTHROPIC_BASE_URL || undefined,
-  });
-  const response = await client.messages.create({
-    model,
-    max_tokens: 4096,
-    messages: [{ role: "user", content: prompt }],
-  });
-  return response.content[0].type === "text" ? response.content[0].text : "";
-}
 
 function flattenToolsWithRefs(
   categories: Category[]

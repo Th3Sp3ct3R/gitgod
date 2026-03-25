@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "gitgod": {
+      "command": "npx",
+      "args": ["tsx", "src/cli.ts", "serve"],
+      "env": {
+        "GITGOD_DATA_DIR": "./data"
+      }
+    }
+  }
+}

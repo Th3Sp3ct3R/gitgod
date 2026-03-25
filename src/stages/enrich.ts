@@ -2,72 +2,9 @@
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import type { Skeleton, Category, Tool, ScrapedData, EnrichProgress } from "../types.js";
+import { parseGitHubUrl, scrapeGitHub, githubApiFetch } from "../lib/github.js";
 
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || "";
-
-function parseGitHubUrl(url: string): { owner: string; repo: string } | null {
-  const match = url.match(/github\.com\/([^\/\s#?]+)\/([^\/\s#?]+)/);
-  if (!match) return null;
-  const repo = match[2].replace(/\.git$/, "");
-  return { owner: match[1], repo };
-}
-
-async function githubApiFetch(endpoint: string): Promise<any> {
-  const headers: Record<string, string> = {
-    "Accept": "application/vnd.github.v3+json",
-    "User-Agent": "GitGod/0.1",
-  };
-  if (GITHUB_TOKEN) {
-    headers["Authorization"] = `Bearer ${GITHUB_TOKEN}`;
-  }
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
-  const res = await fetch(`https://api.github.com/${endpoint}`, {
-    signal: controller.signal,
-    headers,
-  });
-  clearTimeout(timeout);
-
-  if (!res.ok) return null;
-  return res.json();
-}
-
-async function scrapeGitHub(owner: string, repo: string): Promise<ScrapedData | null> {
-  try {
-    const meta = await githubApiFetch(`repos/${owner}/${repo}`);
-    if (!meta) return null;
-
-    // Fetch README (best-effort)
-    let readme = "";
-    try {
-      const readmeData = await githubApiFetch(`repos/${owner}/${repo}/readme`);
-      if (readmeData?.content) {
-        readme = Buffer.from(readmeData.content, "base64").toString("utf-8");
-      }
-    } catch {
-      // No readme available
-    }
-
-    return {
-      title: meta.full_name || `${owner}/${repo}`,
-      description: meta.description || "",
-      content_preview: readme.slice(0, 2000),
-      github_meta: {
-        stars: meta.stargazers_count || 0,
-        language: meta.language || "unknown",
-        last_commit: meta.pushed_at || "",
-        topics: meta.topics || [],
-      },
-      scraped_at: new Date().toISOString(),
-    };
-  } catch (err: any) {
-    if (err.name === "AbortError") {
-      console.log(`    ⏱ Timeout: github.com/${owner}/${repo}`);
-    }
-    return null;
-  }
-}
 
 async function scrapeWebsite(url: string): Promise<ScrapedData | null> {
   try {

@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import path from "node:path";
-import type { Tool, Category, Skeleton } from "../types.js";
+import type { Tool, Category, Skeleton, BrowserIngestedGraph } from "../types.js";
 
 export interface IndexedTool {
   name: string;
@@ -126,7 +126,61 @@ export function loadGraphs(dataDir: string): GraphIndex {
     if (!existsSync(kgPath)) continue;
 
     try {
-      const skeleton: Skeleton = JSON.parse(readFileSync(kgPath, "utf-8"));
+      const raw = JSON.parse(readFileSync(kgPath, "utf-8"));
+
+      // Browser-ingested graph (single-repo entries)
+      if (raw.version === 1 && Array.isArray(raw.entries)) {
+        const biGraph = raw as BrowserIngestedGraph;
+        const biTags = new Map<string, number>();
+
+        for (const entry of biGraph.entries) {
+          for (const tag of entry.synthesis.tags) {
+            biTags.set(tag, (biTags.get(tag) || 0) + 1);
+          }
+          allTools.push({
+            name: `${entry.owner}/${entry.repo}`,
+            url: entry.url,
+            description: entry.scraped.description,
+            link_type: "github",
+            status: "alive",
+            summary: entry.synthesis.summary,
+            tags: entry.synthesis.tags,
+            relevance_score: entry.synthesis.relevance_score,
+            cross_categories: entry.synthesis.cross_categories,
+            duplicates: entry.synthesis.duplicates,
+            categoryPath: entry.synthesis.cross_categories[0] || "Browser Ingested",
+            graphSlug: slug,
+            github_stars: entry.scraped.github_meta?.stars,
+            github_language: entry.scraped.github_meta?.language,
+            last_commit: entry.scraped.github_meta?.last_commit,
+          });
+        }
+
+        const topTags = [...biTags.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 10)
+          .map(([tag]) => tag);
+
+        graphs.push({
+          slug,
+          repo: "browser-ingested",
+          url: "",
+          scraped_at: biGraph.updated_at,
+          skeleton: { repo: "browser-ingested", url: "", scraped_at: biGraph.updated_at, stats: { categories: 0, links: biGraph.entries.length }, taxonomy: [] },
+          stats: {
+            total_tools: biGraph.entries.length,
+            alive: biGraph.entries.length,
+            dead: 0,
+            synthesized: biGraph.entries.length,
+            categories: 0,
+            top_tags: topTags,
+          },
+        });
+        continue;
+      }
+
+      // Standard awesome-list graph
+      const skeleton: Skeleton = raw;
       const { indexed, totalTools, alive, dead, synthesized, allTags } = flattenTools(
         skeleton.taxonomy,
         slug

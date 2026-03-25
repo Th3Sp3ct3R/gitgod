@@ -15,6 +15,14 @@ import { EnvironmentAdapter, Environment } from '../types';
  * Detect the current environment and return appropriate adapter
  */
 export async function detectEnvironment(): Promise<EnvironmentAdapter> {
+  // Allow manual override via environment variable
+  const forcedEnv = process.env.WORKFLOW_ENV;
+  if (forcedEnv) {
+    const adapter = getAdapter(forcedEnv as Environment);
+    adapter.log(`Using forced environment: ${forcedEnv}`);
+    return adapter;
+  }
+
   const adapters = [
     new ClaudeAdapter(),
     new OpenCodeAdapter(),
