@@ -2,7 +2,6 @@
 import { Command } from "commander";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { readFileSync, existsSync } from "node:fs";
 import { startServer } from "./acp/server.js";
 
 const program = new Command();

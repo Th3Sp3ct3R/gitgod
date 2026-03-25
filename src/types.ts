@@ -142,3 +142,18 @@ export interface InvokeToolOutput {
   stderr?: string;
   json?: unknown;
 }
+
+export interface SingleRepoEntry {
+  repo: string;
+  url: string;
+  scraped: ScrapedData;
+  synthesis: SynthesisData;
+  source?: string;
+  imported_at?: string;
+}
+
+export interface BrowserIngestedGraph {
+  version: number;
+  entries: SingleRepoEntry[];
+  updated_at: string;
+}
