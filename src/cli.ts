@@ -6,6 +6,39 @@ import { startServer } from "./acp/server.js";
 
 const program = new Command();
 
+function parsePositiveIntOption(
+  raw: string,
+  label: string,
+  maxValue: number
+): number | undefined {
+  if (raw === "0") return undefined;
+  if (!/^\d+$/.test(raw)) {
+    throw new Error(`Invalid ${label}: ${raw}`);
+  }
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error(`Invalid ${label}: ${raw}`);
+  }
+  if (parsed > maxValue) {
+    throw new Error(`${label} too high (${parsed}); max allowed is ${maxValue}`);
+  }
+  return parsed;
+}
+
+function parseNonNegativeIntOption(raw: string, label: string, maxValue: number): number {
+  if (!/^\d+$/.test(raw)) {
+    throw new Error(`Invalid ${label}: ${raw}`);
+  }
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new Error(`Invalid ${label}: ${raw}`);
+  }
+  if (parsed > maxValue) {
+    throw new Error(`${label} too high (${parsed}); max allowed is ${maxValue}`);
+  }
+  return parsed;
+}
+
 program
   .name("gitgod")
   .description("Deep repo scraper — turns repos into knowledge graphs")
@@ -181,6 +214,123 @@ program
     if (isNaN(c)) throw new Error(`Invalid concurrency value: ${opts.concurrency}`);
     const enrichedPath = await enrich(skeletonPath, c);
     await synthesize(enrichedPath);
+  });
+
+program
+  .command("map-markdown <enriched>")
+  .description("Map subrepo links and scrape them into markdown artifacts")
+  .option("--limit-subrepos <n>", "Optional limit for number of subrepos", "0")
+  .option("--limit-links <n>", "Optional limit for links scraped per subrepo", "0")
+  .option("--link-concurrency <n>", "Concurrent link scraping per subrepo", "8")
+  .option("--repo-concurrency <n>", "Concurrent subrepo crawls", "3")
+  .action(
+    async (
+      enriched: string,
+      opts: {
+        limitSubrepos: string;
+        limitLinks: string;
+        linkConcurrency: string;
+        repoConcurrency: string;
+      }
+    ) => {
+    const { mapAndScrapeMarkdown } = await import("./stages/map-scrape-markdown.js");
+    const limitSubrepos = parsePositiveIntOption(opts.limitSubrepos, "limit-subrepos", 10000);
+    const limitLinksPerRepo = parsePositiveIntOption(opts.limitLinks, "limit-links", 2000);
+    const linkConcurrency = parsePositiveIntOption(opts.linkConcurrency, "link-concurrency", 20);
+    const repoConcurrency = parsePositiveIntOption(opts.repoConcurrency, "repo-concurrency", 10);
+    await mapAndScrapeMarkdown(path.resolve(enriched), {
+      limitSubrepos,
+      limitLinksPerRepo,
+      linkConcurrency,
+      repoConcurrency,
+    });
+    }
+  );
+
+program
+  .command("trendshift-map-topics [url]")
+  .description("Map Trendshift topic pages from the topics index")
+  .option("-o, --output-dir <path>", "Output directory (default: ./data/trendshift/topics-index)")
+  .option("--limit <n>", "Maximum URLs to request from Firecrawl map", "1000")
+  .action(async (url = "https://trendshift.io/topics", opts: { outputDir?: string; limit: string }) => {
+    const { mapTrendshiftTopics } = await import("./stages/trendshift-workflow.js");
+    const limit = parsePositiveIntOption(opts.limit, "limit", 10000) ?? 1000;
+    const result = await mapTrendshiftTopics(url, {
+      outputDir: opts.outputDir ? path.resolve(opts.outputDir) : undefined,
+      limit,
+    });
+    console.log(`\n🗺️  Trendshift topics mapped from: ${result.sourceUrl}`);
+    console.log(`📚 Topics found: ${result.topics.length}`);
+    console.log(`💾 JSON output: ${result.outputPath}\n`);
+    for (const topic of result.topics.slice(0, 20)) {
+      console.log(`- ${topic}`);
+    }
+    if (result.topics.length > 20) {
+      console.log(`...and ${result.topics.length - 20} more`);
+    }
+  });
+
+program
+  .command("trendshift-scrape-topic <url>")
+  .description("Scrape a Trendshift topic page to raw markdown")
+  .option("-o, --output-dir <path>", "Output directory (default: ./data/trendshift/<topic-slug>)")
+  .option("--wait-for <ms>", "Milliseconds to wait for page rendering", "3000")
+  .action(async (url: string, opts: { outputDir?: string; waitFor: string }) => {
+    const { scrapeTrendshiftTopicMarkdown } = await import("./stages/trendshift-workflow.js");
+    const waitFor = parseNonNegativeIntOption(opts.waitFor, "wait-for", 30000);
+    const result = await scrapeTrendshiftTopicMarkdown(url, {
+      outputDir: opts.outputDir ? path.resolve(opts.outputDir) : undefined,
+      waitForMs: waitFor,
+    });
+    console.log(`\n📝 Trendshift topic scraped: ${result.topicUrl}`);
+    console.log(`💾 Markdown output: ${result.markdownPath}\n`);
+  });
+
+program
+  .command("trendshift-extract-repos <markdownPath>")
+  .description("Extract GitHub repos from a scraped Trendshift topic markdown file")
+  .requiredOption("--topic-url <url>", "Trendshift topic page URL")
+  .option("-o, --output-dir <path>", "Output directory (default: same folder as markdown)")
+  .action(async (markdownPath: string, opts: { topicUrl: string; outputDir?: string }) => {
+    const { extractTrendshiftRepos } = await import("./stages/trendshift-workflow.js");
+    const result = await extractTrendshiftRepos(path.resolve(markdownPath), opts.topicUrl, {
+      outputDir: opts.outputDir ? path.resolve(opts.outputDir) : undefined,
+    });
+    console.log(`\n📦 Trendshift topic: ${result.topicName}`);
+    console.log(`🔗 Source: ${result.topicUrl}`);
+    console.log(`📦 Extracted repos: ${result.repos.length}`);
+    console.log(`💾 JSON output: ${result.outputPath}\n`);
+    for (const repo of result.repos.slice(0, 10)) {
+      console.log(`- ${repo.repoName} → ${repo.githubUrl ?? "n/a"}`);
+    }
+    if (result.repos.length > 10) {
+      console.log(`...and ${result.repos.length - 10} more`);
+    }
+  });
+
+program
+  .command("trendshift-topic <url>")
+  .description("Convenience wrapper: scrape a Trendshift topic page and extract GitHub repos")
+  .option("-o, --output-dir <path>", "Output directory (default: ./data/trendshift/<topic-slug>)")
+  .option("--wait-for <ms>", "Milliseconds to wait for page rendering", "3000")
+  .action(async (url: string, opts: { outputDir?: string; waitFor: string }) => {
+    const { scrapeTrendshiftTopic } = await import("./stages/trendshift-topic.js");
+    const waitFor = parseNonNegativeIntOption(opts.waitFor, "wait-for", 30000);
+    const result = await scrapeTrendshiftTopic(url, {
+      outputDir: opts.outputDir ? path.resolve(opts.outputDir) : undefined,
+      waitForMs: waitFor,
+    });
+    console.log(`\n📈 Trendshift topic: ${result.topicName}`);
+    console.log(`🔗 Source: ${result.topicUrl}`);
+    console.log(`📦 Extracted repos: ${result.repos.length}`);
+    console.log(`📝 Raw markdown: ${result.markdownPath}`);
+    console.log(`💾 JSON output: ${result.outputPath}\n`);
+    for (const repo of result.repos.slice(0, 10)) {
+      console.log(`- ${repo.repoName} → ${repo.githubUrl ?? "n/a"}`);
+    }
+    if (result.repos.length > 10) {
+      console.log(`...and ${result.repos.length - 10} more`);
+    }
   });
 
 program

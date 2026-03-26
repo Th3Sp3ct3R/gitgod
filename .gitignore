@@ -4,3 +4,6 @@ data/
 *.py
 *.mjs
 SYNTHESIS_REPORT.md
+.DS_Store
+.kilocode/
+.tmp/
