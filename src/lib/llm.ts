@@ -1,6 +1,41 @@
-export type LLMProvider = "anthropic" | "openrouter";
+export type LLMProvider = "anthropic" | "openrouter" | "kimicode";
+
+function detectKimiKey(): string | undefined {
+  return (
+    process.env.KIMICODE_API_KEY ||
+    process.env.KIMI_API_KEY ||
+    process.env.MOONSHOT_API_KEY
+  );
+}
 
 export function detectProvider(): { provider: LLMProvider; model: string } {
+  const forced = process.env.LLM_PROVIDER?.toLowerCase();
+  if (forced === "kimicode" || forced === "kimi") {
+    return {
+      provider: "kimicode",
+      model: process.env.KIMICODE_MODEL || process.env.KIMI_MODEL || "kimi-k2.5",
+    };
+  }
+  if (forced === "openrouter") {
+    return {
+      provider: "openrouter",
+      model: process.env.OPENROUTER_MODEL || "arcee-ai/trinity-large-preview:free",
+    };
+  }
+  if (forced === "anthropic") {
+    return {
+      provider: "anthropic",
+      model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514",
+    };
+  }
+
+  if (detectKimiKey()) {
+    return {
+      provider: "kimicode",
+      model: process.env.KIMICODE_MODEL || process.env.KIMI_MODEL || "kimi-k2.5",
+    };
+  }
+
   if (process.env.OPENROUTER_API_KEY) {
     return {
       provider: "openrouter",
@@ -16,6 +51,45 @@ export function detectProvider(): { provider: LLMProvider; model: string } {
 
 export async function callLLM(prompt: string): Promise<string> {
   const { provider, model } = detectProvider();
+
+  if (provider === "kimicode") {
+    const kimiKey = detectKimiKey();
+    if (!kimiKey) {
+      throw new Error(
+        "KIMICODE_API_KEY (or KIMI_API_KEY / MOONSHOT_API_KEY) is required when provider is kimicode."
+      );
+    }
+
+    const baseUrl = (process.env.KIMICODE_BASE_URL || "https://api.moonshot.ai/v1").replace(
+      /\/+$/,
+      ""
+    );
+    const res = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${kimiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 4096,
+      }),
+    });
+    if (!res.ok) throw new Error(`KimiCode error: ${res.status} ${await res.text()}`);
+    const data = (await res.json()) as {
+      choices?: Array<{ message?: { content?: string | Array<{ text?: string }> } }>;
+    };
+    const content = data.choices?.[0]?.message?.content;
+    if (typeof content === "string") return content;
+    if (Array.isArray(content)) {
+      return content
+        .map((part) => (typeof part?.text === "string" ? part.text : ""))
+        .join("")
+        .trim();
+    }
+    return "";
+  }
 
   if (provider === "openrouter") {
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
