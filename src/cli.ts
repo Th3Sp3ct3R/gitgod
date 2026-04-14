@@ -178,6 +178,37 @@ program
   });
 
 program
+  .command("audit-starred")
+  .description("Audit GitHub starred repos vs ingested repos and show pipeline queue status")
+  .option("-d, --data-dir <path>", "Data directory (default: ./data)", "./data")
+  .option("-s, --starred-file <path>", "Optional file with one repo per line (owner/repo or GitHub URL)")
+  .option(
+    "-o, --output <path>",
+    "Optional markdown audit output path (default: data/audits/starred-audit.md)",
+    "./data/audits/starred-audit.md"
+  )
+  .action(async (opts: { dataDir: string; starredFile?: string; output?: string }) => {
+    const { auditStarred } = await import("./stages/audit-starred.js");
+    const { result, outputPath } = auditStarred({
+      dataDir: path.resolve(process.cwd(), opts.dataDir),
+      starredFilePath: opts.starredFile ? path.resolve(process.cwd(), opts.starredFile) : undefined,
+      outputPath: opts.output ? path.resolve(process.cwd(), opts.output) : undefined,
+    });
+
+    console.log("\n📊 Starred vs Ingested Audit");
+    console.log(`Starred repos: ${result.starred_total}`);
+    console.log(`Ingested repos: ${result.ingested_total}`);
+    console.log(`Overlap: ${result.overlap_total}`);
+    console.log(`Missing in GitGod: ${result.missing_in_ingested.length}`);
+    console.log(`Ingested but not starred: ${result.ingested_not_starred.length}`);
+    console.log(`Pipeline entries: ${result.pipeline.length}`);
+    if (outputPath) {
+      console.log(`Markdown report: ${outputPath}`);
+    }
+    console.log("");
+  });
+
+program
   .command("list")
   .description("List all entries in the knowledge graph")
   .option("-d, --data-dir <path>", "Data directory (default: ./data)", "./data")
