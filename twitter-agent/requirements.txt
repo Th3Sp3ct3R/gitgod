@@ -1,0 +1,9 @@
+twikit>=2.0.0
+tweepy>=4.14.0
+ascii_graph>=1.5.1
+tqdm>=4.60.0
+numpy>=1.21.0
+rich>=13.0.0
+click>=8.1.0
+aiofiles>=23.0.0
+python-dateutil>=2.8.0

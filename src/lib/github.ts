@@ -31,6 +31,8 @@ export async function githubApiFetch(endpoint: string): Promise<any> {
   return res.json();
 }
 
+import { CLASSIFIER_OMEGA_MAX_INPUT_CHARS } from "./llm-classifier.js";
+
 export async function scrapeGitHub(owner: string, repo: string): Promise<any | null> {
   try {
     const meta = await githubApiFetch(`repos/${owner}/${repo}`);
@@ -46,7 +48,7 @@ export async function scrapeGitHub(owner: string, repo: string): Promise<any | n
       // no readme
     }
 
-    return {
+    const row: Record<string, unknown> = {
       title: meta.full_name || `${owner}/${repo}`,
       description: meta.description || "",
       content_preview: readme.slice(0, 2000),
@@ -58,6 +60,10 @@ export async function scrapeGitHub(owner: string, repo: string): Promise<any | n
       },
       scraped_at: new Date().toISOString(),
     };
+    if (readme.length > 0) {
+      row.content_text = readme.slice(0, CLASSIFIER_OMEGA_MAX_INPUT_CHARS);
+    }
+    return row;
   } catch {
     return null;
   }

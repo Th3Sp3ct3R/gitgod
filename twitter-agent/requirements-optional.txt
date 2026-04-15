@@ -1,0 +1,3 @@
+# Optional: hosted social search (Instagram, Reddit, TikTok, X) via XPOZ API.
+# Install: pip install -r requirements-optional.txt
+xpoz>=0.4.1

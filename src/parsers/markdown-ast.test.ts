@@ -1,6 +1,6 @@
 // src/parsers/markdown-ast.test.ts
 import { test, describe, expect } from "vitest";
-import { parseReadme } from "./markdown-ast.js";
+import { parseReadme, extractHttpLinksFromMarkdown } from "./markdown-ast.js";
 
 describe("parseReadme", () => {
   test("extracts categories from headings", () => {
@@ -32,5 +32,24 @@ describe("parseReadme", () => {
     const result = parseReadme(md, "test/repo");
     expect(result.stats.categories).toBe(2);
     expect(result.stats.links).toBe(3);
+  });
+
+  test("extracts all absolute http links from markdown", () => {
+    const md = `# Repo
+
+- [Website](https://example.com)
+- [Relative](./docs/setup.md)
+
+| Name | Link |
+| --- | --- |
+| Tool A | [Repo A](https://github.com/user/repo-a) |
+| Tool B | [Repo B](https://github.com/user/repo-b) |
+`;
+    const links = extractHttpLinksFromMarkdown(md);
+    expect(links).toEqual([
+      "https://example.com",
+      "https://github.com/user/repo-a",
+      "https://github.com/user/repo-b",
+    ]);
   });
 });

@@ -1,0 +1,46 @@
+{
+  "title": "Weekly AI/LLM Research Digest",
+  "slug": "arxiv-llm-daily",
+  "target_audience": "machine learning engineers and AI researchers",
+  "repo_source": "https://github.com/0xHalo22/arxiv-llm-daily",
+  "sections": [
+    {
+      "heading": "Introduction",
+      "content_points": [
+        "What is arxiv-llm-daily?",
+        "Why machine learning engineers and AI researchers should care",
+        "The problem it solves"
+      ]
+    },
+    {
+      "heading": "Key Features",
+      "content_points": []
+    },
+    {
+      "heading": "How to Use It",
+      "content_points": [
+        "Installation/setup",
+        "Basic usage example",
+        "Advanced tips"
+      ]
+    },
+    {
+      "heading": "Real-World Applications",
+      "content_points": [
+        "Use cases for machine learning engineers and AI researchers",
+        "Integration with existing workflows"
+      ]
+    },
+    {
+      "heading": "Conclusion",
+      "content_points": [
+        "Summary of benefits",
+        "Next steps for readers"
+      ]
+    }
+  ],
+  "key_takeaways": [],
+  "cta": "Check out arxiv-llm-daily at https://github.com/0xHalo22/arxiv-llm-daily and let us know what you build!",
+  "status": "draft",
+  "created_at": "2026-04-14T23:59:35.314Z"
+}

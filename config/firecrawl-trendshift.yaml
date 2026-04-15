@@ -1,0 +1,40 @@
+# Firecrawl configuration for Trendshift GitHub link extraction
+#
+# Usage:
+#   firecrawl scrape https://trendshift.io/ --format markdown --wait-for 5000
+#   firecrawl map https://trendshift.io/ --limit 1000 --json
+#
+# The explore page (https://trendshift.io/) renders repo cards client-side.
+# Each card contains a [GitHub](https://github.com/owner/repo) link.
+#
+# Strategy:
+#   - Use `firecrawl scrape` with --wait-for 5000 to let JS render the cards
+#   - Extract GitHub URLs from the markdown using regex
+#   - firecrawl map only returns trendshift.io internal links (no GitHub)
+#     because GitHub links are rendered client-side
+#
+# For individual repo pages (trendshift.io/repositories/<id>):
+#   - Contains [Visit GitHub](https://github.com/owner/repo)
+#   - Use scrape if you need per-repo metadata (language, stars, etc.)
+
+targets:
+  explore:
+    url: "https://trendshift.io/"
+    method: scrape
+    format: markdown
+    wait_for_ms: 5000
+    github_link_pattern: "\\[GitHub\\]\\((https://github\\.com/[^)]+)\\)"
+    schedule: "*/3 days"
+
+  repo_detail:
+    url_pattern: "https://trendshift.io/repositories/{id}"
+    method: scrape
+    format: markdown
+    wait_for_ms: 3000
+    github_link_pattern: "\\[Visit GitHub\\]\\((https://github\\.com/[^)]+)\\)"
+
+  topics_index:
+    url: "https://trendshift.io/topics"
+    method: map
+    limit: 1000
+    filter_pattern: "https://trendshift.io/topics/"

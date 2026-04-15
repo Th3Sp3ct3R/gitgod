@@ -1,0 +1,24 @@
+{
+  "name": "andrej-karpathy-skills",
+  "type": "guidelines",
+  "description": "Karpathy-inspired Claude Code guidelines - 4 principles for better LLM coding: Think Before Coding, Simplicity First, Surgical Changes, Goal-Driven Execution",
+  "commands": [
+    "/plugin marketplace add forrestchang/andrej-karpathy-skills",
+    "/plugin install andrej-karpathy-skills@karpathy-skills",
+    "curl -o CLAUDE.md https://raw.githubusercontent.com/forrestchang/andrej-karpathy-skills/main/CLAUDE.md"
+  ],
+  "usage_examples": [
+    "Add to Claude Code via plugin marketplace",
+    "Include CLAUDE.md in project root for per-project guidelines"
+  ],
+  "install_instructions": [
+    "/plugin install andrej-karpathy-skills@karpathy-skills",
+    "curl -o CLAUDE.md https://raw.githubusercontent.com/forrestchang/andrej-karpathy-skills/main/CLAUDE.md"
+  ],
+  "source_repo": "https://github.com/forrestchang/andrej-karpathy-skills",
+  "tags": [
+    "guidelines",
+    "cli",
+    "automation"
+  ]
+}

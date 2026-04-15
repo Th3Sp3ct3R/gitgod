@@ -1,0 +1,21 @@
+Tweet 1/3:
+🧵 This week's most interesting AI papers from arXiv
+
+A thread 🧵👇
+
+---
+
+Tweet 2/3:
+arxiv-llm-daily: Daily digest of fresh arXiv papers in cs.CL and cs.AI, committed to git. The git history is the slowest possible newsletter.
+
+Here's what makes it interesting:
+
+---
+
+Tweet 3/3:
+Want to try it?
+
+Check it out here 👇
+https://github.com/0xHalo22/arxiv-llm-daily
+
+---

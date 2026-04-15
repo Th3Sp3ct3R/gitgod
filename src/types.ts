@@ -25,10 +25,33 @@ export interface Skeleton {
   taxonomy: Category[];
 }
 
+/** LLM Classifier-Ω output (enrich when GITGOD_CLASSIFIER_OMEGA=1). See docs/prompts/CLASSIFIER-OMEGA-SYSTEM.md */
+export interface OmegaClassification {
+  website_type: string;
+  is_competitor: boolean;
+  competitor_reason: string | null;
+  is_another_agent: boolean;
+  agent_type: string | null;
+  agent_capabilities: string[];
+  threat_level: string;
+  threat_justification: string;
+  key_technologies: string[];
+  target_audience: string;
+  red_flags: string[];
+  summary: string;
+  action_recommendation: string;
+  /** 0–100 model-reported certainty */
+  confidence: number;
+  /** Privacy, bias, oversight notes; null if none */
+  ethics_notes: string | null;
+}
+
 export interface ScrapedData {
   title: string;
   description: string;
   content_preview: string;
+  /** Long text for Classifier-Ω (up to ~120k chars) when GITGOD_CLASSIFIER_OMEGA is set during enrich */
+  content_text?: string;
   github_meta?: {
     stars: number;
     language: string;
@@ -36,6 +59,21 @@ export interface ScrapedData {
     topics: string[];
   };
   scraped_at: string;
+  content_format?: 'markdown' | 'json' | 'json_with_md';
+  content_category?: string;
+  classifier_confidence?: number;
+  omega_classification?: OmegaClassification;
+  llms_txt_source?: string;
+  firecrawl_method?:
+    | "MAP"
+    | "SCRAPE"
+    | "BATCH_SCRAPE"
+    | "CRAWL"
+    | "INTERACT"
+    | "SEARCH"
+    | "LLMS_TXT_BYPASS";
+  firecrawl_credits?: number;
+  interact_output?: string;
 }
 
 export interface SynthesisData {
@@ -114,12 +152,17 @@ export interface HarnessConfig {
   slug?: string;
   repoPath: string;
   decomposition: DecomposeResult;
+  decompositionPath?: string;
   dataDir?: string;
   outputDir?: string;
   refineFocus?: string;
+  discoveryManifestPath?: string | false;
+  workflowMapPath?: string | false;
+  allowFallback?: boolean;
 }
 
 export interface HarnessResult {
+  status: "harnessed" | "decomposed_no_harness";
   cliName: string;
   commands: CLICommand[];
   skillMdPath: string;
@@ -128,6 +171,9 @@ export interface HarnessResult {
     failed: number;
   };
   workflows: WorkflowChain[];
+  cachePath: string;
+  workflowPath?: string;
+  fallbackReason?: string;
 }
 
 export interface InvokeToolInput {
@@ -150,6 +196,10 @@ export interface SingleRepoEntry {
   synthesis: SynthesisData;
   source?: string;
   imported_at?: string;
+  /** GitHub org/user when known from ingest */
+  owner?: string;
+  /** When the entry was ingested (some stages use this key) */
+  ingested_at?: string;
 }
 
 export interface BrowserIngestedGraph {

@@ -1,0 +1,119 @@
+[
+  {
+    "repo": "forrestchang/andrej-karpathy-skills",
+    "actions": [
+      {
+        "type": "add_to_docs",
+        "doc_path": "docs/coding-standards/andrej-karpathy-skills.md"
+      },
+      {
+        "type": "skill_extract",
+        "skill_name": "andrej-karpathy-skills"
+      },
+      {
+        "type": "blog_post",
+        "angle": "How to Apply andrej-karpathy-skills in Your Projects",
+        "audience": "software engineers"
+      }
+    ],
+    "priority": "high",
+    "reasoning": "Coding guidelines - reusable across all projects"
+  },
+  {
+    "repo": "Yeachan-Heo/oh-my-claudecode",
+    "actions": [
+      {
+        "type": "blog_post",
+        "angle": "Tool Review: oh-my-claudecode - Claude Code Power-Up",
+        "audience": "Claude Code users"
+      },
+      {
+        "type": "add_to_docs",
+        "doc_path": "docs/claude-code/tools.md"
+      },
+      {
+        "type": "skill_extract",
+        "skill_name": "oh-my-claudecode"
+      }
+    ],
+    "priority": "medium",
+    "reasoning": "CLI tool for Claude Code - practical utility content"
+  },
+  {
+    "repo": "0xHalo22/arxiv-llm-daily",
+    "actions": [
+      {
+        "type": "blog_post",
+        "angle": "Weekly AI/LLM Research Digest",
+        "audience": "machine learning engineers and AI researchers"
+      },
+      {
+        "type": "twitter_thread",
+        "hook": "🧵 This week's most interesting AI papers from arXiv"
+      },
+      {
+        "type": "newsletter_item",
+        "section": "Research Spotlight"
+      }
+    ],
+    "priority": "medium",
+    "reasoning": "arXiv digest - good for weekly research roundups"
+  },
+  {
+    "repo": "0xHalo22/hn-daily",
+    "actions": [
+      {
+        "type": "blog_post",
+        "angle": "What Developers Are Actually Talking About",
+        "audience": "software developers and tech founders"
+      },
+      {
+        "type": "twitter_thread",
+        "hook": "📰 Trending on Hacker News this week"
+      }
+    ],
+    "priority": "medium",
+    "reasoning": "HN front page - signals developer interest"
+  },
+  {
+    "repo": "0xHalo22/api-diff",
+    "actions": [
+      {
+        "type": "api_track",
+        "sources": [
+          "stripe",
+          "github",
+          "anthropic",
+          "mdn",
+          "rfcs"
+        ],
+        "target": "docs/api-changes/"
+      },
+      {
+        "type": "monitor",
+        "check_interval": "Daily via GitHub Actions"
+      },
+      {
+        "type": "newsletter_item",
+        "section": "API Changelog"
+      }
+    ],
+    "priority": "high",
+    "reasoning": "API tracker for Stripe, GitHub, Anthropic, MDN, RFCs - time-sensitive changes"
+  },
+  {
+    "repo": "0xHalo22/crate-of-the-day",
+    "actions": [
+      {
+        "type": "twitter_thread",
+        "hook": "🦀 Daily Rust crate you should know about"
+      },
+      {
+        "type": "newsletter_item",
+        "section": "Rust Ecosystem"
+      }
+    ],
+    "priority": "low",
+    "reasoning": "Rust crate discovery - niche but valuable"
+  }
+]

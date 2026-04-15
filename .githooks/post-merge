@@ -1,0 +1,11 @@
+#!/bin/sh
+# After git pull/merge: refresh repo-classifications snapshot if knowledge graphs exist.
+[ "${GITGOD_SKIP_HOOKS:-}" = "1" ] && exit 0
+cd "$(git rev-parse --show-toplevel)" 2>/dev/null || exit 0
+[ -f package.json ] || exit 0
+command -v npm >/dev/null 2>&1 || exit 0
+if [ ! -d data ]; then exit 0; fi
+# shellcheck disable=SC2012
+ls data/*/knowledge-graph.json >/dev/null 2>&1 || exit 0
+npm run -s classify:json 2>/dev/null || true
+exit 0

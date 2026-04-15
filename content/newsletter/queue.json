@@ -1,0 +1,26 @@
+[
+  {
+    "section": "Research Spotlight",
+    "headline": "arxiv-llm-daily",
+    "blurb": "Daily digest of fresh arXiv papers in cs.CL and cs.AI, committed to git. The git history is the slowest possible newsletter.",
+    "link": "https://github.com/0xHalo22/arxiv-llm-daily",
+    "added_at": "2026-04-14T23:59:35.315Z",
+    "status": "queued"
+  },
+  {
+    "section": "API Changelog",
+    "headline": "api-diff",
+    "blurb": "Vendor API documentation changes, tracked in git. The git history IS the changelog. Tracks Stripe, GitHub REST, Anthropic, MDN, Python PEPs, RFCs.",
+    "link": "https://github.com/0xHalo22/api-diff",
+    "added_at": "2026-04-14T23:59:35.316Z",
+    "status": "queued"
+  },
+  {
+    "section": "Rust Ecosystem",
+    "headline": "crate-of-the-day",
+    "blurb": "One hand-picked Rust crate highlighted every day, committed to git. A daily dose of ecosystem serendipity.",
+    "link": "https://github.com/0xHalo22/crate-of-the-day",
+    "added_at": "2026-04-14T23:59:35.316Z",
+    "status": "queued"
+  }
+]

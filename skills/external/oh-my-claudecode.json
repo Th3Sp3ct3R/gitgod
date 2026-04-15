@@ -1,0 +1,25 @@
+{
+  "name": "oh-my-claudecode",
+  "type": "cli",
+  "description": "Multi-agent orchestration CLI for Claude Code. Adds /autopilot, /setup commands and workflow automation. npm: oh-my-claude-sisyphus",
+  "commands": [
+    "/plugin marketplace add https://github.com/Yeachan-Heo/oh-my-claudecode",
+    "/plugin install oh-my-claudecode",
+    "npm i -g oh-my-claude-sisyphus@latest"
+  ],
+  "usage_examples": [
+    "/autopilot \"build a REST API for managing tasks\"",
+    "/setup - Initialize OMC in project",
+    "omc setup - From terminal"
+  ],
+  "install_instructions": [
+    "/plugin install oh-my-claudecode",
+    "npm i -g oh-my-claude-sisyphus@latest"
+  ],
+  "source_repo": "https://github.com/Yeachan-Heo/oh-my-claudecode",
+  "tags": [
+    "cli",
+    "cli",
+    "automation"
+  ]
+}

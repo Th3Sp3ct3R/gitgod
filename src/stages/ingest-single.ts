@@ -52,22 +52,21 @@ export function mergeHarnessIntoGraph(
 
 export async function ingestSingleRepo(url: string, dataDir: string): Promise<string> {
   const slug = slugFromUrl(url);
-  const defaultDataDir = path.resolve("data");
   const targetDataDir = path.resolve(dataDir);
   mkdirSync(targetDataDir, { recursive: true });
 
+  // cloneAndParse always writes under cwd ./data/<slug>/ — run enrich/synthesize there
+  // so paths never drift from a mismatched targetSkeletonPath.
   const skeletonPath = await cloneAndParse(url);
-  const generatedRepoDir = path.dirname(skeletonPath);
-  const targetRepoDir = path.join(targetDataDir, slug);
-
-  if (defaultDataDir !== targetDataDir) {
-    rmSync(targetRepoDir, { recursive: true, force: true });
-    cpSync(generatedRepoDir, targetRepoDir, { recursive: true });
-  }
-
-  const targetSkeletonPath = path.join(targetRepoDir, "skeleton.json");
-  const enrichedPath = await enrich(targetSkeletonPath, 1);
+  const workDir = path.dirname(skeletonPath);
+  const enrichedPath = await enrich(skeletonPath, 1);
   await synthesize(enrichedPath);
+
+  const targetRepoDir = path.join(targetDataDir, slug);
+  if (path.resolve(workDir) !== path.resolve(targetRepoDir)) {
+    rmSync(targetRepoDir, { recursive: true, force: true });
+    cpSync(workDir, targetRepoDir, { recursive: true });
+  }
 
   return path.join(targetRepoDir, "knowledge-graph.json");
 }

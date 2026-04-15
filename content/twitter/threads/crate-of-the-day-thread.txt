@@ -1,0 +1,21 @@
+Tweet 1/3:
+🦀 Daily Rust crate you should know about
+
+A thread 🧵👇
+
+---
+
+Tweet 2/3:
+crate-of-the-day: One hand-picked Rust crate highlighted every day, committed to git. A daily dose of ecosystem serendipity.
+
+Here's what makes it interesting:
+
+---
+
+Tweet 3/3:
+Want to try it?
+
+Check it out here 👇
+https://github.com/0xHalo22/crate-of-the-day
+
+---

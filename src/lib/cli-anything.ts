@@ -8,6 +8,7 @@ export interface CliAnythingRunConfig {
   repoPath: string;
   refineFocus?: string;
   cliAnythingRoot?: string;
+  autoGenerate?: boolean;
 }
 
 export interface CliAnythingArtifacts {
@@ -18,6 +19,20 @@ export interface CliAnythingArtifacts {
   harnessDir: string;
   rawPaths: string[];
   mode: "consume" | "subprocess";
+}
+
+export class MissingHarnessArtifactsError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "MissingHarnessArtifactsError";
+  }
+}
+
+export class CliAnythingGenerationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CliAnythingGenerationError";
+  }
 }
 
 function walkFiles(dir: string): string[] {
@@ -184,6 +199,10 @@ function runCliAnythingSubprocess(config: CliAnythingRunConfig): boolean {
   return true;
 }
 
+function hasConfiguredCliAnythingCommand(): boolean {
+  return Boolean(process.env.CLI_ANYTHING_COMMAND?.trim());
+}
+
 function inferCliName(repoPath: string): string {
   return `cli-anything-${path.basename(repoPath)}`;
 }
@@ -191,7 +210,7 @@ function inferCliName(repoPath: string): string {
 export async function parseCliAnythingArtifacts(repoPath: string): Promise<CliAnythingArtifacts> {
   const harnessDir = path.join(repoPath, "agent-harness");
   if (!existsSync(harnessDir)) {
-    throw new Error(`No agent-harness directory found at ${harnessDir}.`);
+    throw new MissingHarnessArtifactsError(`No agent-harness directory found at ${harnessDir}.`);
   }
 
   const files = walkFiles(harnessDir);
@@ -199,7 +218,7 @@ export async function parseCliAnythingArtifacts(repoPath: string): Promise<CliAn
   const skillMdPath =
     skillCandidates.find((f) => /\/skills\/SKILL\.md$/i.test(f)) ?? skillCandidates[0];
   if (!skillMdPath) {
-    throw new Error(`No SKILL.md found under ${harnessDir}.`);
+    throw new MissingHarnessArtifactsError(`No SKILL.md found under ${harnessDir}.`);
   }
 
   const testMdPath = files.find((f) => /(?:^|\/)TEST\.md$/i.test(f));
@@ -218,13 +237,21 @@ export async function parseCliAnythingArtifacts(repoPath: string): Promise<CliAn
 }
 
 export async function runCliAnything(config: CliAnythingRunConfig): Promise<CliAnythingArtifacts> {
-  const usedSubprocess = runCliAnythingSubprocess(config);
-  const artifacts = await parseCliAnythingArtifacts(config.repoPath);
-  if (usedSubprocess) {
-    return { ...artifacts, mode: "subprocess" };
+  const autoGenerate = config.autoGenerate ?? true;
+
+  if (autoGenerate && hasConfiguredCliAnythingCommand()) {
+    try {
+      runCliAnythingSubprocess(config);
+    } catch (generationError) {
+      const message = generationError instanceof Error ? generationError.message : String(generationError);
+      throw new CliAnythingGenerationError(`CLI-Anything generation failed: ${message}`);
+    }
+    const generatedArtifacts = await parseCliAnythingArtifacts(config.repoPath);
+    await readFile(generatedArtifacts.skillMdPath, "utf-8");
+    return { ...generatedArtifacts, mode: "subprocess" };
   }
 
-  // touch file in read path to ensure path exists and is readable
+  const artifacts = await parseCliAnythingArtifacts(config.repoPath);
   await readFile(artifacts.skillMdPath, "utf-8");
   return artifacts;
 }

@@ -1,0 +1,31 @@
+{
+  "name": "api-diff",
+  "repo": "https://github.com/0xHalo22/api-diff",
+  "sources": [
+    "stripe",
+    "github",
+    "anthropic",
+    "mdn",
+    "rfcs"
+  ],
+  "tracked_endpoints": [
+    "stripe/charges",
+    "stripe/customers",
+    "stripe/subscriptions",
+    "stripe/webhooks",
+    "github/repos",
+    "github/issues",
+    "github/pulls",
+    "github/actions",
+    "anthropic/messages",
+    "anthropic/completions",
+    "mdn/web-apis",
+    "mdn/javascript",
+    "mdn/css",
+    "rfcs/http",
+    "rfcs/tcp",
+    "rfcs/udp"
+  ],
+  "last_checked": "2026-04-14T23:59:35.315Z",
+  "changes_detected": []
+}

@@ -7,6 +7,9 @@ import { compare } from "./tools/compare.js";
 import { recommend } from "./tools/recommend.js";
 import { ingestHarness } from "./tools/ingest.js";
 import { invokeHarnessCommand } from "./tools/invoke.js";
+import { researchMergeTool } from "./tools/research-merge-mcp.js";
+import { scrapeWebTool, starPollRunTool, starPollStatus } from "./tools/backend-mcp.js";
+import { exaAnswerTool, exaContentsTool, exaSearchTool } from "./tools/exa-mcp.js";
 
 export interface JsonRpcRequest {
   jsonrpc: "2.0";
@@ -130,9 +133,126 @@ const TOOL_DEFINITIONS = [
       required: ["tool", "command"],
     },
   },
+  {
+    name: "research_merge",
+    description:
+      "Merge Firecrawl web search and `gh search repos` into one markdown report plus structured hits. Requires FIRECRAWL_API_KEY for web search (unless skip_firecrawl) and `gh` on PATH for GitHub (unless skip_gh).",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        query: { type: "string", description: "Search query" },
+        firecrawl_limit: { type: "number", description: "Max Firecrawl web results (default 10)" },
+        gh_limit: { type: "number", description: "Max gh repo results (default 15)" },
+        skip_firecrawl: { type: "boolean", description: "Skip Firecrawl even if key is set" },
+        skip_gh: { type: "boolean", description: "Skip GitHub CLI search" },
+        fc_categories: {
+          type: "array",
+          items: { type: "string" },
+          description: "Firecrawl category bias: github, research, pdf",
+        },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "scrape_web",
+    description:
+      "Fetch page content via Firecrawl: single-page scrape (default) or shallow crawl from a seed URL. Requires FIRECRAWL_API_KEY. Large markdown is truncated.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        url: { type: "string", description: "HTTP(S) URL to scrape or crawl from" },
+        mode: {
+          type: "string",
+          enum: ["scrape", "crawl"],
+          description: "scrape = one page; crawl = follow links up to crawl_limit (default 50)",
+        },
+        crawl_limit: { type: "number", description: "Max pages when mode is crawl (default 50, max 500)" },
+        max_markdown_chars: {
+          type: "number",
+          description: "Max markdown characters per page (default 80000, cap 200000)",
+        },
+      },
+      required: ["url"],
+    },
+  },
+  {
+    name: "star_poll_status",
+    description:
+      "Read GitHub star poller state (repos + optional star lists). Path: STARRED_STATE_FILE env or <dataDir>/github-starred-state.json.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
+  {
+    name: "star_poll_run",
+    description:
+      "Run scripts/poll-github-starred.ts from cwd via npx tsx (diff stars/lists, optional POST to STARWEBHOOK_URL). Use dry_run to print actions without writing state or POSTing. Requires repo root cwd; set GITHUB_TOKEN for live GitHub API.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        dry_run: { type: "boolean", description: "Pass --dry-run (no POST, no state write)" },
+        init: { type: "boolean", description: "Pass --init (re-baseline state)" },
+        verbose: { type: "boolean", description: "Pass --verbose" },
+      },
+    },
+  },
+  {
+    name: "exa_search",
+    description:
+      "Exa semantic web search (POST /search). Optional freshness (day|week|month|year) maps to recent publish dates. Requires EXA_API_KEY.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        query: { type: "string", description: "Search query" },
+        numResults: { type: "number", description: "Max results 1–100 (default 10)" },
+        freshness: {
+          type: "string",
+          enum: ["day", "week", "month", "year"],
+          description: "Prefer pages published after now minus this window",
+        },
+        type: { type: "string", description: "Exa search type (e.g. auto, neural, fast, deep, instant)" },
+        category: { type: "string", description: "Optional category (e.g. news, company, people)" },
+        includeHighlights: { type: "boolean", description: "Request highlight snippets (default true)" },
+        highlightsMaxCharacters: { type: "number", description: "Per-result highlight cap when includeHighlights is true" },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "exa_contents",
+    description:
+      "Exa URL contents / crawl (POST /contents): clean text for one or more URLs. Requires EXA_API_KEY.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        urls: { type: "array", items: { type: "string" }, description: "HTTP(S) URLs to fetch" },
+        maxCharacters: { type: "number", description: "Max characters per page text (default 10000)" },
+      },
+      required: ["urls"],
+    },
+  },
+  {
+    name: "exa_answer",
+    description:
+      "Exa answer with citations (POST /answer): LLM-generated answer from web search results. Requires EXA_API_KEY.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        query: { type: "string", description: "Question or topic" },
+        text: { type: "boolean", description: "Include full text on citation objects (default true)" },
+      },
+      required: ["query"],
+    },
+  },
 ];
 
-export function handleRequest(req: JsonRpcRequest, index: GraphIndex, dataDir: string): JsonRpcResponse {
+export async function handleRequest(
+  req: JsonRpcRequest,
+  index: GraphIndex,
+  dataDir: string
+): Promise<JsonRpcResponse> {
   const { id, method, params } = req;
 
   if (method === "initialize") {
@@ -184,6 +304,33 @@ export function handleRequest(req: JsonRpcRequest, index: GraphIndex, dataDir: s
             dataDir,
             args as unknown as Parameters<typeof invokeHarnessCommand>[1]
           );
+          break;
+        case "research_merge":
+          result = await researchMergeTool(
+            args as unknown as Parameters<typeof researchMergeTool>[0]
+          );
+          break;
+        case "scrape_web":
+          result = await scrapeWebTool(
+            args as unknown as Parameters<typeof scrapeWebTool>[0]
+          );
+          break;
+        case "star_poll_status":
+          result = starPollStatus(dataDir);
+          break;
+        case "star_poll_run":
+          result = starPollRunTool(
+            args as unknown as Parameters<typeof starPollRunTool>[0]
+          );
+          break;
+        case "exa_search":
+          result = await exaSearchTool(args as unknown as Parameters<typeof exaSearchTool>[0]);
+          break;
+        case "exa_contents":
+          result = await exaContentsTool(args as unknown as Parameters<typeof exaContentsTool>[0]);
+          break;
+        case "exa_answer":
+          result = await exaAnswerTool(args as unknown as Parameters<typeof exaAnswerTool>[0]);
           break;
         default:
           return {
@@ -279,11 +426,11 @@ export function startServer(dataDir: string): void {
     // Hot-reload: re-scan data directory
     index = loadGraphs(dataDir);
 
-    const response = handleRequest(req, index, dataDir);
-
-    if (req.id !== undefined) {
-      sendResponse(response);
-    }
+    void handleRequest(req, index, dataDir).then((response) => {
+      if (req.id !== undefined) {
+        sendResponse(response);
+      }
+    });
   }
 
   function sendResponse(res: JsonRpcResponse) {

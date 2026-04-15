@@ -1,0 +1,34 @@
+[
+  {
+    "name": "Firecrawl",
+    "blog_url": "https://www.firecrawl.dev/blog",
+    "md_file": "~/Documents/vanta-brain/Research/LLM-Docs/Blogs/Firecrawl Blog.md",
+    "link_pattern": "href=\"(/blog/[a-z0-9-]+)\"",
+    "base_url": "https://www.firecrawl.dev",
+    "category": "llm-tools"
+  },
+  {
+    "name": "Kimi",
+    "blog_url": "https://kimi.ai/blog",
+    "md_file": "~/Documents/vanta-brain/Research/LLM-Docs/Blogs/Kimi Blog.md",
+    "link_pattern": "href=\"(/blog/[a-z0-9-]+)\"",
+    "base_url": "https://kimi.ai",
+    "category": "llm"
+  },
+  {
+    "name": "Anthropic",
+    "blog_url": "https://www.anthropic.com/news",
+    "md_file": "~/Documents/vanta-brain/Research/LLM-Docs/Blogs/Anthropic Blog.md",
+    "link_pattern": "href=\"(/news/[a-z0-9-]+)\"",
+    "base_url": "https://www.anthropic.com",
+    "category": "llm"
+  },
+  {
+    "name": "OpenAI",
+    "blog_url": "https://openai.com/blog",
+    "md_file": "~/Documents/vanta-brain/Research/LLM-Docs/Blogs/OpenAI Blog.md",
+    "link_pattern": "href=\"(/index/[a-z0-9-]+)\"",
+    "base_url": "https://openai.com",
+    "category": "llm"
+  }
+]

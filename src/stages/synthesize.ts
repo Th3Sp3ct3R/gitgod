@@ -27,6 +27,13 @@ function flattenToolsWithRefs(
   return result;
 }
 
+function buildToolIdentitySignature(tools: { tool: Tool; categoryPath: string }[]): string {
+  return tools
+    .map(({ tool, categoryPath }) => `${categoryPath}::${tool.name}::${tool.url}`)
+    .sort()
+    .join("\n");
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -112,13 +119,43 @@ export async function synthesize(enrichedPath: string): Promise<string> {
   const dataDir = path.dirname(enrichedPath);
   const outputPath = path.join(dataDir, "knowledge-graph.json");
 
-  // Resume from knowledge-graph.json if it exists, otherwise start from enriched
-  let skeleton: Skeleton;
+  // Always load enriched as source-of-truth; optionally resume synthesis progress from output.
+  const enrichedSkeleton: Skeleton = JSON.parse(readFileSync(enrichedPath, "utf-8"));
+  let skeleton: Skeleton = enrichedSkeleton;
+
   try {
-    skeleton = JSON.parse(readFileSync(outputPath, "utf-8"));
-    console.log(`[Stage 3] Resuming from ${outputPath}`);
+    const previous: Skeleton = JSON.parse(readFileSync(outputPath, "utf-8"));
+    const prevTools = flattenToolsWithRefs(previous.taxonomy);
+    const freshTools = flattenToolsWithRefs(enrichedSkeleton.taxonomy);
+    const sameRepo = previous.repo === enrichedSkeleton.repo;
+    const sameToolIdentity =
+      buildToolIdentitySignature(prevTools) === buildToolIdentitySignature(freshTools);
+
+    if (sameRepo && sameToolIdentity) {
+      skeleton = previous;
+      console.log(`[Stage 3] Resuming from ${outputPath}`);
+    } else {
+      // Recover any prior synthesis by URL/name while keeping fresh enrich output.
+      const prevByUrl = new Map(
+        prevTools
+          .filter(({ tool }) => Boolean(tool.synthesis))
+          .map(({ tool }) => [tool.url, tool.synthesis] as const)
+      );
+      const prevByName = new Map(
+        prevTools
+          .filter(({ tool }) => Boolean(tool.synthesis))
+          .map(({ tool }) => [tool.name, tool.synthesis] as const)
+      );
+      for (const { tool } of freshTools) {
+        tool.synthesis = prevByUrl.get(tool.url) ?? prevByName.get(tool.name) ?? tool.synthesis;
+      }
+      skeleton = enrichedSkeleton;
+      console.log(
+        `[Stage 3] Detected stale output (${prevTools.length} vs ${freshTools.length} tools), rebuilding from enriched`
+      );
+    }
   } catch {
-    skeleton = JSON.parse(readFileSync(enrichedPath, "utf-8"));
+    skeleton = enrichedSkeleton;
   }
 
   const { provider, model } = detectProvider();
@@ -133,6 +170,7 @@ export async function synthesize(enrichedPath: string): Promise<string> {
   console.log(`  Provider: ${provider} | Model: ${model}`);
 
   if (needsSynthesis.length === 0) {
+    writeFileSync(outputPath, JSON.stringify(skeleton, null, 2));
     console.log(`  Nothing to do — all tools already synthesized`);
     return outputPath;
   }

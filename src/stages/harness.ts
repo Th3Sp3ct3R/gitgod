@@ -1,7 +1,11 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { DecomposeResult, HarnessConfig, HarnessResult, WorkflowChain } from "../types.js";
-import { runCliAnything } from "../lib/cli-anything.js";
+import {
+  CliAnythingGenerationError,
+  MissingHarnessArtifactsError,
+  runCliAnything,
+} from "../lib/cli-anything.js";
 import { parseHarnessToGraph } from "../parsers/harness-parser.js";
 import { mergeHarnessIntoGraph } from "./ingest-single.js";
 
@@ -114,71 +118,168 @@ function buildWorkflowMapSection(slug: string, workflows: WorkflowChain[]): stri
   return lines.join("\n");
 }
 
+function writeWorkflowArtifact(artifactDir: string, workflows: WorkflowChain[]): string {
+  const workflowPath = path.join(artifactDir, "workflows.json");
+  writeFileSync(workflowPath, JSON.stringify(workflows, null, 2));
+  return workflowPath;
+}
+
+function writeHarnessCache(cachePath: string, payload: Record<string, unknown>): string {
+  writeFileSync(cachePath, JSON.stringify(payload, null, 2));
+  return cachePath;
+}
+
+function buildFallbackSummary(config: HarnessConfig, slug: string, workflows: WorkflowChain[], reason: string): string {
+  const lines: string[] = [];
+  lines.push(`# ${slug} fallback harness`);
+  lines.push("");
+  lines.push("status: `decomposed_no_harness`");
+  lines.push("");
+  lines.push(`reason: ${reason}`);
+  lines.push("");
+  lines.push(`repo: \`${config.decomposition.repo}\``);
+  lines.push(`checkout path: \`${config.repoPath}\``);
+  if (config.decompositionPath) {
+    lines.push(`decomposition path: \`${config.decompositionPath}\``);
+  }
+  lines.push("");
+  lines.push(`inferred workflows: ${workflows.length}`);
+  if (workflows.length > 0) {
+    lines.push("");
+    lines.push("## Workflow IDs");
+    lines.push("");
+    for (const workflow of workflows) {
+      lines.push(`- \`${workflow.id}\` — ${workflow.title}`);
+    }
+  }
+  return lines.join("\n");
+}
+
+function buildFallbackResult(
+  config: HarnessConfig,
+  slug: string,
+  artifactDir: string,
+  cachePath: string,
+  workflows: WorkflowChain[],
+  reason: string
+): HarnessResult {
+  const fallbackDocPath = path.join(artifactDir, "FALLBACK.md");
+  writeFileSync(fallbackDocPath, `${buildFallbackSummary(config, slug, workflows, reason)}\n`);
+  const workflowPath = writeWorkflowArtifact(artifactDir, workflows);
+
+  writeHarnessCache(cachePath, {
+    status: "decomposed_no_harness",
+    cliName: `fallback-${slug}`,
+    repoPath: config.repoPath,
+    decompositionPath: config.decompositionPath,
+    skillMdPath: fallbackDocPath,
+    workflowPath,
+    workflows,
+    commands: [],
+    testResults: { passed: 0, failed: 0 },
+    fallbackReason: reason,
+  });
+
+  return {
+    status: "decomposed_no_harness",
+    cliName: `fallback-${slug}`,
+    commands: [],
+    skillMdPath: fallbackDocPath,
+    testResults: { passed: 0, failed: 0 },
+    workflows,
+    cachePath,
+    workflowPath,
+    fallbackReason: reason,
+  };
+}
+
+function shouldFallbackFromHarnessError(error: unknown): boolean {
+  return error instanceof MissingHarnessArtifactsError || error instanceof CliAnythingGenerationError;
+}
+
 export async function harness(config: HarnessConfig): Promise<HarnessResult> {
   const slug = config.slug ?? repoSlug(config.repoPath);
   const rootDir = process.cwd();
   const dataDir = path.resolve(rootDir, config.dataDir ?? "data");
   const outputDir = path.resolve(rootDir, config.outputDir ?? path.join(dataDir, "harnesses"));
   mkdirSync(outputDir, { recursive: true });
-
-  const artifacts = await runCliAnything({
-    repoPath: config.repoPath,
-    refineFocus: config.refineFocus,
-  });
   const workflows = buildWorkflowCandidates(config.decomposition);
   const artifactDir = path.join(outputDir, slug);
+  const cachePath = path.join(outputDir, `${slug}.json`);
   mkdirSync(artifactDir, { recursive: true });
-  const localSkillMdPath = path.join(artifactDir, "SKILL.md");
-  copyFileSync(artifacts.skillMdPath, localSkillMdPath);
-  const localTestMdPath = artifacts.testMdPath ? path.join(artifactDir, "TEST.md") : undefined;
-  if (artifacts.testMdPath && localTestMdPath) {
-    copyFileSync(artifacts.testMdPath, localTestMdPath);
+
+  let result: HarnessResult;
+  try {
+    const artifacts = await runCliAnything({
+      repoPath: config.repoPath,
+      refineFocus: config.refineFocus,
+      autoGenerate: true,
+    });
+    const localSkillMdPath = path.join(artifactDir, "SKILL.md");
+    copyFileSync(artifacts.skillMdPath, localSkillMdPath);
+    const localTestMdPath = artifacts.testMdPath ? path.join(artifactDir, "TEST.md") : undefined;
+    if (artifacts.testMdPath && localTestMdPath) {
+      copyFileSync(artifacts.testMdPath, localTestMdPath);
+    }
+
+    const parserResult = parseHarnessToGraph(
+      artifacts.cliName,
+      artifacts.commands,
+      workflows,
+      localSkillMdPath
+    );
+
+    const mergedGraphPath = mergeHarnessIntoGraph(dataDir, slug, parserResult);
+    const workflowPath = writeWorkflowArtifact(artifactDir, workflows);
+
+    const testRaw = localTestMdPath ? readTextOrEmpty(localTestMdPath) : "";
+    const passed = (testRaw.match(/\bpass(?:ed)?\b/gi) ?? []).length;
+    const failed = (testRaw.match(/\bfail(?:ed)?\b/gi) ?? []).length;
+
+    result = {
+      status: "harnessed",
+      cliName: artifacts.cliName,
+      commands: artifacts.commands,
+      skillMdPath: localSkillMdPath,
+      testResults: { passed, failed },
+      workflows,
+      cachePath,
+      workflowPath,
+    };
+
+    writeHarnessCache(cachePath, {
+      ...result,
+      repoPath: config.repoPath,
+      decompositionPath: config.decompositionPath,
+      harnessDir: artifacts.harnessDir,
+      graphPath: mergedGraphPath,
+      testMdPath: localTestMdPath,
+      mode: artifacts.mode,
+    });
+  } catch (error) {
+    if (config.allowFallback === false || !shouldFallbackFromHarnessError(error)) {
+      throw error;
+    }
+    const reason = error instanceof Error ? error.message : String(error);
+    result = buildFallbackResult(config, slug, artifactDir, cachePath, workflows, reason);
   }
 
-  const parserResult = parseHarnessToGraph(
-    artifacts.cliName,
-    artifacts.commands,
-    workflows,
-    localSkillMdPath
-  );
-
-  const mergedGraphPath = mergeHarnessIntoGraph(dataDir, slug, parserResult);
-
-  const testRaw = localTestMdPath ? readTextOrEmpty(localTestMdPath) : "";
-  const passed = (testRaw.match(/\bpass(?:ed)?\b/gi) ?? []).length;
-  const failed = (testRaw.match(/\bfail(?:ed)?\b/gi) ?? []).length;
-
-  const result: HarnessResult = {
-    cliName: artifacts.cliName,
-    commands: artifacts.commands,
-    skillMdPath: localSkillMdPath,
-    testResults: { passed, failed },
-    workflows,
-  };
-
-  const cachePath = path.join(outputDir, `${slug}.json`);
-  writeFileSync(
-    cachePath,
-    JSON.stringify(
-      {
-        ...result,
-        repoPath: config.repoPath,
-        harnessDir: artifacts.harnessDir,
-        graphPath: mergedGraphPath,
-        testMdPath: localTestMdPath,
-        mode: artifacts.mode,
-      },
-      null,
-      2
-    )
-  );
-
-  const manifestPath = path.resolve(rootDir, "CLI_DISCOVERY_MANIFEST.md");
-  const workflowMapPath = path.resolve(rootDir, "WORKFLOW_MAP.md");
+  const manifestPath =
+    config.discoveryManifestPath === false
+      ? false
+      : path.resolve(rootDir, config.discoveryManifestPath ?? "CLI_DISCOVERY_MANIFEST.md");
+  const workflowMapPath =
+    config.workflowMapPath === false
+      ? false
+      : path.resolve(rootDir, config.workflowMapPath ?? "WORKFLOW_MAP.md");
   const manifestSection = buildManifestSection(slug, config.decomposition);
   const workflowSection = buildWorkflowMapSection(slug, workflows);
-  upsertMarkdownSection(manifestPath, slug, manifestSection);
-  upsertMarkdownSection(workflowMapPath, slug, workflowSection);
+  if (manifestPath) {
+    upsertMarkdownSection(manifestPath, slug, manifestSection);
+  }
+  if (workflowMapPath) {
+    upsertMarkdownSection(workflowMapPath, slug, workflowSection);
+  }
 
   return result;
 }

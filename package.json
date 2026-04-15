@@ -3,17 +3,27 @@
   "version": "0.1.0",
   "type": "module",
   "bin": {
-    "gitgod": "./dist/cli.js"
+    "gitgod": "./dist/cli.js",
+    "hackingtool-serve": "./dist/plugins/hackingtool/serve-entry.js"
   },
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/cli.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "classify": "tsx scripts/classify-repos-from-kg.ts --limit 20",
+    "classify:all": "tsx scripts/classify-repos-from-kg.ts --all",
+    "classify:json": "mkdir -p data && tsx scripts/classify-repos-from-kg.ts --all --json > data/repo-classifications.jsonl",
+    "hooks:install": "bash scripts/install-git-hooks.sh",
+    "starred:poll": "tsx scripts/poll-github-starred.ts",
+    "analyze-repo": "tsx src/cli.ts analyze-repo"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
     "commander": "^13.0.0",
+    "dotenv": "^17.3.1",
+    "firecrawl": "^4.18.1",
+    "node-html-parser": "^7.1.0",
     "remark-gfm": "^4.0.1",
     "remark-parse": "^11.0.0",
     "unified": "^11.0.0",
