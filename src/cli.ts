@@ -139,9 +139,45 @@ program
   .option("--exclude <patterns>", "Comma-separated path substrings to exclude (e.g. /blog,/news)")
   .option("--dry-run", "Discover URLs without scraping", false)
   .option("-v, --verbose", "Verbose output", false)
-  .action(async (domain: string, opts: { dataDir: string; maxPages: string; include?: string; exclude?: string; dryRun: boolean; verbose: boolean }) => {
+  .option(
+    "--allow-github-discovery",
+    "Keep github.com URLs from llms.txt in the discovered list (they are still skipped at scrape; use repo ingest for GitHub)",
+    false
+  )
+  .option(
+    "--map-first-doc",
+    "Prioritize /docs + /api in scrape order, reserve ~15% of max-pages (min 5) for blog/changelog paths, then other URLs; same-origin only (no GitHub in discovery list)",
+    false
+  )
+  .option(
+    "--llms-only",
+    "Zero-credit lane: probe llms.txt, parse structured entries (title + description + URL), fetch each via plain HTTP + MarkItDown, STOP. No Firecrawl, no Exa, no SPA detection.",
+    false
+  )
+  .option(
+    "--rss",
+    "Discover and ingest RSS/Atom feeds — writes each entry as a feed_entry markdown file in _feed/ subdirectory",
+    false
+  )
+  .action(
+    async (
+      domain: string,
+      opts: {
+        dataDir: string;
+        maxPages: string;
+        include?: string;
+        exclude?: string;
+        dryRun: boolean;
+        verbose: boolean;
+        allowGithubDiscovery: boolean;
+        mapFirstDoc: boolean;
+        llmsOnly: boolean;
+        rss: boolean;
+      }
+    ) => {
     const { ingestDomain } = await import("./stages/ingest-domain.js");
     const dataDir = path.resolve(process.cwd(), opts.dataDir);
+    const mapFirst = opts.mapFirstDoc === true;
     await ingestDomain(domain, {
       dataDir,
       maxPages: parseInt(opts.maxPages, 10),
@@ -149,8 +185,13 @@ program
       verbose: opts.verbose,
       includePatterns: opts.include?.split(",").map((s) => s.trim()).filter(Boolean),
       excludePatterns: opts.exclude?.split(",").map((s) => s.trim()).filter(Boolean),
+      includeGitHubDiscovery: mapFirst ? false : opts.allowGithubDiscovery,
+      mapFirstDocPipeline: mapFirst,
+      llmsOnly: opts.llmsOnly,
+      rss: opts.rss,
     });
-  });
+  }
+  );
 
 program
   .command("synthesize <enriched>")
